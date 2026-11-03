@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="id" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="SORTIVA adalah aplikasi machine learning untuk membantu mengenali dan mengklasifikasikan jenis sampah.">
+  <title>SORTIVA — Klasifikasi Sampah Berbasis Machine Learning</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['"Plus Jakarta Sans"', 'sans-serif'],
+            sans: ['"DM Sans"', 'sans-serif']
+          },
+          colors: {
+            ink: '#10261c',
+            forest: '#0b3b29',
+            fern: '#17633f',
+            mint: '#b8e8c8',
+            paper: '#f7f8f3',
+            sand: '#ecefe7',
+            moss: '#dcebdc'
+          },
+          boxShadow: {
+            soft: '0 24px 60px -30px rgba(16, 38, 28, 0.35)',
+            panel: '0 18px 45px -24px rgba(6, 47, 29, 0.55)'
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+    }
+
+    html {
+      scroll-padding-top: 6rem;
+    }
+
+    body {
+      background: #f7f8f3;
+    }
+
+    .hero-surface {
+      background:
+        radial-gradient(circle at 88% 12%, rgba(110, 199, 143, 0.25), transparent 28%),
+        radial-gradient(circle at 8% 90%, rgba(62, 143, 95, 0.2), transparent 30%),
+        linear-gradient(135deg, #092c1d 0%, #0b3b29 55%, #145237 100%);
+    }
+
+    .hero-surface::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      opacity: 0.18;
+      background-image: radial-gradient(rgba(217, 249, 226, 0.45) 0.8px, transparent 0.8px);
+      background-size: 26px 26px;
+      mask-image: linear-gradient(to bottom right, black, transparent 70%);
+    }
+
+    .hero-surface > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    .classification-bar {
+      background: linear-gradient(90deg, #68c78b 0%, #b6e9c4 100%);
+    }
+
+    .result-card {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid rgba(16, 38, 28, 0.08);
+    }
+
+    .result-card > div:first-child { padding: 1rem 1.25rem; }
+    .result-card > div:last-child { padding: 1.25rem; }
+
+    .result-card::before {
+      content: '';
+      position: absolute;
+      width: 13rem;
+      height: 13rem;
+      top: -7rem;
+      right: -5rem;
+      border: 1px solid rgba(23, 99, 63, 0.12);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .result-visual {
+      position: relative;
+      isolation: isolate;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.7), transparent 28%),
+        linear-gradient(135deg, #dcebdc, #f5f6ec);
+    }
+
+    .result-visual::before,
+    .result-visual::after {
+      content: '';
+      position: absolute;
+      z-index: 0;
+      border: 1px solid rgba(23, 99, 63, 0.13);
+      border-radius: 50%;
+    }
+
+    .result-visual::before { width: 12rem; height: 12rem; }
+    .result-visual::after { width: 17rem; height: 17rem; opacity: 0.55; }
+
+    .result-object {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 5.5rem;
+      height: 5.5rem;
+      border: 0.65rem solid rgba(255, 255, 255, 0.92);
+      border-radius: 50%;
+      color: #17633f;
+      background: #e8f4e8;
+      box-shadow: 0 10px 22px -16px rgba(11, 59, 41, 0.75);
+    }
+
+    .result-sample-label,
+    .result-sample-state {
+      position: absolute;
+      z-index: 2;
+      color: rgba(16, 38, 28, 0.48);
+      font-size: 0.58rem;
+      font-weight: 700;
+      letter-spacing: 0.14em;
+      line-height: 1;
+      text-transform: uppercase;
+    }
+
+    .result-sample-label { top: 0.75rem; left: 0.8rem; }
+    .result-sample-state { right: 0.8rem; bottom: 0.75rem; letter-spacing: 0.1em; }
+
+    .result-confidence {
+      display: flex;
+      align-items: baseline;
+      gap: 0.3rem;
+    }
+
+    .result-confidence small {
+      color: rgba(16, 38, 28, 0.5);
+      font-size: 0.62rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .result-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.7rem;
+      color: rgba(16, 38, 28, 0.58);
+      font-size: 0.65rem;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    .result-nature {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.3rem;
+      color: #17633f;
+    }
+
+    .result-insight {
+      padding: 0.75rem 0.875rem;
+      border: 1px solid rgba(23, 99, 63, 0.12);
+      background: #edf8ef;
+    }
+
+    .menu-open .mobile-menu {
+      display: block;
+    }
+
+    .menu-open .menu-icon-open {
+      display: none;
+    }
+
+    .menu-open .menu-icon-close {
+      display: inline-block;
+    }
+
+    .menu-icon-close {
+      display: none;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+      }
+    }
+  </style>
+</head>
+<body class="font-sans text-ink antialiased selection:bg-forest selection:text-white">
+
+  <header id="site-header" class="fixed inset-x-0 top-0 z-50 border-b border-transparent bg-paper/90 backdrop-blur-xl transition-colors duration-300">
+    <div class="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-6 px-5 sm:px-8 lg:px-10">
+      <a href="#beranda" class="group flex min-w-0 items-center gap-3" aria-label="SORTIVA, kembali ke beranda">
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-forest text-mint shadow-soft transition-transform duration-200 group-hover:-rotate-6">
+          <i class="fa-solid fa-leaf text-lg" aria-hidden="true"></i>
+        </span>
+        <span class="min-w-0">
+          <span class="flex items-center gap-2">
+            <span class="font-display text-lg font-extrabold tracking-tight text-forest">SORTIVA</span>
+            <span class="hidden rounded-full bg-moss px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.12em] text-fern sm:inline-flex">Adiwiyata</span>
+          </span>
+          <span class="hidden truncate text-[11px] font-medium text-ink/60 sm:block">The Stembayo Eco-Sort Platform</span>
+        </span>
+      </a>
+
+      <nav class="hidden items-center gap-1 rounded-full border border-ink/5 bg-white/70 p-1 shadow-sm lg:flex" aria-label="Navigasi utama">
+        <a href="#beranda" class="rounded-full bg-forest px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-fern">Beranda</a>
+        <a href="#cara-kerja" class="rounded-full px-4 py-2 text-xs font-semibold text-ink/65 transition hover:bg-moss hover:text-forest">Cara Kerja</a>
+        <a href="#jenis-sampah" class="rounded-full px-4 py-2 text-xs font-semibold text-ink/65 transition hover:bg-moss hover:text-forest">Jenis Sampah</a>
+        <a href="#tentang" class="rounded-full px-4 py-2 text-xs font-semibold text-ink/65 transition hover:bg-moss hover:text-forest">Tentang</a>
+      </nav>
+
+      <div class="flex items-center gap-2">
+        <a href="dashboard.html" class="hidden rounded-full px-4 py-2 text-xs font-bold text-fern transition hover:bg-moss sm:inline-flex">Lihat Dashboard</a>
+        <a href="Konsol Kamera.html" class="inline-flex items-center gap-2 rounded-full bg-forest px-4 py-2.5 text-xs font-bold text-white shadow-panel transition hover:-translate-y-0.5 hover:bg-fern focus:outline-none focus:ring-2 focus:ring-fern focus:ring-offset-2">
+          <i class="fa-solid fa-camera" aria-hidden="true"></i>
+          <span class="hidden sm:inline">Buka Kamera</span>
+          <span class="sm:hidden">Mulai</span>
+        </a>
+        <button id="menu-toggle" type="button" class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-ink/10 bg-white text-forest lg:hidden" aria-expanded="false" aria-controls="mobile-menu" aria-label="Buka menu">
+          <i class="menu-icon-open fa-solid fa-bars" aria-hidden="true"></i>
+          <i class="menu-icon-close fa-solid fa-xmark" aria-hidden="true"></i>
+        </button>
+      </div>
+    </div>
+
+    <nav id="mobile-menu" class="mobile-menu hidden border-t border-ink/5 bg-paper px-5 py-4 lg:hidden" aria-label="Navigasi mobile">
+      <div class="mx-auto flex max-w-7xl flex-col gap-1 sm:px-3">
+        <a href="#beranda" class="rounded-xl px-4 py-3 text-sm font-bold text-forest hover:bg-moss">Beranda</a>
+        <a href="#cara-kerja" class="rounded-xl px-4 py-3 text-sm font-semibold text-ink/70 hover:bg-moss">Cara Kerja</a>
+        <a href="#jenis-sampah" class="rounded-xl px-4 py-3 text-sm font-semibold text-ink/70 hover:bg-moss">Jenis Sampah</a>
+        <a href="#tentang" class="rounded-xl px-4 py-3 text-sm font-semibold text-ink/70 hover:bg-moss">Tentang</a>
+        <a href="dashboard.html" class="mt-2 rounded-xl bg-moss px-4 py-3 text-sm font-bold text-fern">Lihat Dashboard</a>
+      </div>
+    </nav>
+  </header>
+
+  <main>
+    <section id="beranda" class="px-4 pb-14 pt-24 sm:px-6 sm:pt-28 lg:px-10 lg:pb-20">
+      <div class="hero-surface relative mx-auto grid max-w-7xl items-center gap-12 overflow-hidden px-6 py-14 text-white sm:px-12 sm:py-16 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16 lg:px-16 lg:py-20">
+        <div class="max-w-2xl">
+          <h1 class="font-display text-4xl font-extrabold leading-[1.05] tracking-[-0.04em] text-white sm:text-6xl lg:text-[4.7rem]">
+            Kenali sampah.<br>
+            <span class="text-mint">Pilah lebih tepat.</span>
+          </h1>
+          <p class="mt-6 max-w-xl text-base leading-7 text-white/75 sm:text-lg">
+            SORTIVA membantu kamu mengenali jenis sampah melalui kamera atau unggahan gambar menggunakan model machine learning buatan Stembayo.
+          </p>
+
+          <div class="mt-9 flex flex-col gap-3 sm:flex-row">
+            <a href="Konsol Kamera.html" class="inline-flex items-center justify-center gap-3 rounded-xl bg-white px-5 py-3.5 text-sm font-bold text-forest shadow-lg transition hover:-translate-y-0.5 hover:bg-mint focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-forest">
+              <i class="fa-solid fa-camera" aria-hidden="true"></i>
+              Buka Konsol Kamera
+            </a>
+            <a href="#cara-kerja" class="inline-flex items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/5 px-5 py-3.5 text-sm font-bold text-white transition hover:border-white/40 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-mint focus:ring-offset-2 focus:ring-offset-forest">
+              Pelajari cara kerja
+              <i class="fa-solid fa-arrow-down-long text-xs" aria-hidden="true"></i>
+            </a>
+          </div>
+
+          <div class="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-xs font-semibold text-white/65">
+            <span class="inline-flex items-center gap-2"><i class="fa-solid fa-circle-check text-mint" aria-hidden="true"></i>Berbasis gambar</span>
+            <span class="inline-flex items-center gap-2"><i class="fa-solid fa-circle-check text-mint" aria-hidden="true"></i>Hasil mudah dipahami</span>
+            <span class="inline-flex items-center gap-2"><i class="fa-solid fa-circle-check text-mint" aria-hidden="true"></i>Untuk pembelajaran Adiwiyata</span>
+          </div>
+        </div>
+
+        <div class="relative mx-auto w-full max-w-md lg:ml-auto" aria-label="Contoh hasil klasifikasi SORTIVA">
+          <div class="absolute -inset-5 rounded-[2rem] bg-mint/10 blur-2xl"></div>
+          <div class="result-card relative rounded-2xl border border-white/15 bg-[#f6faf2] text-ink shadow-2xl">
+            <div class="flex items-center justify-between border-b border-ink/10 px-5 py-4">
+              <div class="flex items-center gap-2.5">
+                <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-moss text-fern"><i class="fa-solid fa-wand-magic-sparkles text-sm" aria-hidden="true"></i></span>
+                <div>
+                  <p class="text-xs font-bold text-ink">Hasil klasifikasi</p>
+                  <p class="text-[11px] text-ink/50">Contoh tampilan SORTIVA</p>
+                </div>
+              </div>
+              <span class="rounded-full bg-moss px-2.5 py-1 text-[10px] font-bold text-fern">Selesai</span>
+            </div>
+
+            <div class="space-y-5 p-5 sm:p-6">
+              <div class="result-visual flex h-36 items-center justify-center rounded-xl">
+                <span class="result-sample-label">Visual sample / 01</span>
+                <div class="result-object">
+                  <i class="fa-solid fa-bottle-water text-3xl" aria-hidden="true"></i>
+                </div>
+                <span class="result-sample-state">Visual match</span>
+              </div>
+              <div>
+                <div class="flex items-end justify-between gap-4">
+                  <div>
+                    <p class="text-[11px] font-bold uppercase tracking-[0.16em] text-ink/45">Jenis terdeteksi</p>
+                    <p class="mt-1 font-display text-2xl font-extrabold text-forest">Plastik</p>
+                  </div>
+                  <p class="result-confidence font-display text-2xl font-extrabold text-fern">94<span class="text-base">%</span><small>Tinggi</small></p>
+                </div>
+                <div class="mt-3 h-2 overflow-hidden rounded-full bg-sand" role="progressbar" aria-label="Tingkat keyakinan 94 persen" aria-valuenow="94" aria-valuemin="0" aria-valuemax="100">
+                  <div class="classification-bar h-full w-[94%] rounded-full"></div>
+                </div>
+              </div>
+              <div class="result-meta">
+                <span class="result-nature"><i class="fa-solid fa-recycle" aria-hidden="true"></i> Non-Biodegradable</span>
+                <span>8 kelas material</span>
+              </div>
+              <div class="result-insight flex items-start gap-3 rounded-xl px-3.5 py-3 text-xs leading-5 text-fern">
+                <i class="fa-solid fa-lightbulb mt-0.5 text-sm" aria-hidden="true"></i>
+                <p><strong>Insight:</strong> pastikan botol kosong sebelum dipilah agar lebih mudah diproses.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="cara-kerja" class="scroll-mt-20 border-y border-ink/5 bg-white px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
+      <div class="mx-auto max-w-7xl">
+        <div class="max-w-2xl">
+          <h2 class="font-display text-3xl font-extrabold tracking-[-0.035em] text-forest sm:text-5xl">Dari gambar menjadi pemahaman.</h2>
+          <p class="mt-4 max-w-xl text-base leading-7 text-ink/65">Tidak perlu menebak. Masukkan gambar, lihat hasil prediksi model, lalu gunakan informasinya untuk membiasakan pemilahan yang lebih baik.</p>
+        </div>
+
+        <div class="mt-12 grid gap-6 md:grid-cols-3">
+          <article class="relative border-t-2 border-fern pt-6">
+            <span class="font-display text-5xl font-extrabold tracking-[-0.06em] text-moss">01</span>
+            <h3 class="mt-5 font-display text-xl font-bold text-forest">Ambil atau unggah gambar</h3>
+            <p class="mt-3 text-sm leading-6 text-ink/65">Gunakan konsol kamera untuk memindai langsung atau unggah foto sampah dari perangkatmu.</p>
+            <a href="Konsol Kamera.html" class="mt-5 inline-flex items-center gap-2 text-sm font-bold text-fern hover:text-forest">Mulai memindai <i class="fa-solid fa-arrow-right text-xs" aria-hidden="true"></i></a>
+          </article>
+          <article class="relative border-t-2 border-fern pt-6">
+            <span class="font-display text-5xl font-extrabold tracking-[-0.06em] text-moss">02</span>
+            <h3 class="mt-5 font-display text-xl font-bold text-forest">Model membaca objek</h3>
+            <p class="mt-3 text-sm leading-6 text-ink/65">Model machine learning SORTIVA menganalisis ciri visual untuk memperkirakan jenis material yang terlihat.</p>
+            <span class="mt-5 inline-flex items-center gap-2 text-sm font-bold text-fern"><i class="fa-solid fa-brain text-xs" aria-hidden="true"></i> Model klasifikasi SORTIVA</span>
+          </article>
+          <article class="relative border-t-2 border-fern pt-6">
+            <span class="font-display text-5xl font-extrabold tracking-[-0.06em] text-moss">03</span>
+            <h3 class="mt-5 font-display text-xl font-bold text-forest">Pahami hasilnya</h3>
+            <p class="mt-3 text-sm leading-6 text-ink/65">Hasil klasifikasi dan tingkat keyakinan ditampilkan secara ringkas agar mudah dipelajari dan ditindaklanjuti.</p>
+            <a href="dashboard.html" class="mt-5 inline-flex items-center gap-2 text-sm font-bold text-fern hover:text-forest">Buka analitik <i class="fa-solid fa-arrow-right text-xs" aria-hidden="true"></i></a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="jenis-sampah" class="scroll-mt-20 bg-paper px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
+      <div class="mx-auto grid max-w-7xl gap-12 lg:grid-cols-[0.8fr_1.2fr] lg:items-start lg:gap-20">
+        <div>
+          <h2 class="font-display text-3xl font-extrabold tracking-[-0.035em] text-forest sm:text-5xl">Kenali lebih banyak jenis sampah.</h2>
+          <p class="mt-5 text-base leading-7 text-ink/65">SORTIVA dilatih untuk mengenali beberapa material yang sering ditemui di lingkungan sekolah. Gunakan hasilnya sebagai panduan awal untuk memahami karakter sampah.</p>
+          <div class="mt-8 flex items-center gap-3 border-t border-ink/10 pt-5">
+            <span class="flex h-10 w-10 items-center justify-center rounded-full bg-forest text-mint"><i class="fa-solid fa-graduation-cap" aria-hidden="true"></i></span>
+            <p class="text-sm font-semibold leading-5 text-forest">Teknologi untuk belajar memilah, bukan sekadar mengenali.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-x-5 gap-y-3 sm:grid-cols-4">
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-bottle-water text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Plastik</p><p class="mt-1 text-xs text-ink/50">Plastic</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-coins text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Logam</p><p class="mt-1 text-xs text-ink/50">Metal</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-wine-glass text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Kaca</p><p class="mt-1 text-xs text-ink/50">Glass</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-file-lines text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Kertas</p><p class="mt-1 text-xs text-ink/50">Paper</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-box-open text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Kardus</p><p class="mt-1 text-xs text-ink/50">Cardboard</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-apple-whole text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Organik</p><p class="mt-1 text-xs text-ink/50">Organic waste</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-bolt text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">E-waste</p><p class="mt-1 text-xs text-ink/50">Electronic waste</p></div>
+          <div class="border-b border-ink/10 pb-4"><i class="fa-solid fa-kit-medical text-fern" aria-hidden="true"></i><p class="mt-3 text-sm font-bold text-forest">Medis</p><p class="mt-1 text-xs text-ink/50">Medical waste</p></div>
+        </div>
+      </div>
+    </section>
+
+    <section id="tentang" class="scroll-mt-20 bg-white px-5 py-20 sm:px-8 lg:px-10 lg:py-24">
+      <div class="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-[1fr_1.15fr] lg:gap-20">
+        <div class="relative overflow-hidden rounded-[1.75rem] bg-forest p-8 text-white shadow-panel sm:p-10">
+          <div class="absolute -right-10 -top-10 h-40 w-40 rounded-full border border-mint/20"></div>
+          <div class="absolute -bottom-16 -left-10 h-48 w-48 rounded-full border border-mint/10"></div>
+          <div class="relative">
+            <span class="flex h-14 w-14 items-center justify-center rounded-2xl bg-mint text-forest"><i class="fa-solid fa-seedling text-2xl" aria-hidden="true"></i></span>
+            <h2 class="mt-8 font-display text-3xl font-extrabold tracking-[-0.035em] sm:text-4xl">Belajar memilah dimulai dari mengenali.</h2>
+            <p class="mt-5 max-w-md text-sm leading-6 text-white/70">SORTIVA dibuat untuk mendukung kebiasaan ramah lingkungan di SMK Negeri 2 Depok Sleman. Setiap klasifikasi menjadi kesempatan untuk belajar mengambil keputusan yang lebih bertanggung jawab.</p>
+            <a href="dashboard.html" class="mt-8 inline-flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-forest transition hover:bg-mint">Lihat ringkasan analitik <i class="fa-solid fa-arrow-up-right-from-square text-xs" aria-hidden="true"></i></a>
+          </div>
+        </div>
+
+        <div>
+          <h2 class="font-display text-3xl font-extrabold tracking-[-0.035em] text-forest sm:text-5xl">Teknologi yang dekat dengan keseharian sekolah.</h2>
+          <p class="mt-5 text-base leading-7 text-ink/65">Kami menggabungkan antarmuka yang sederhana dengan model computer vision agar proses mengenali sampah terasa jelas, cepat, dan mudah dipahami oleh siswa maupun pendamping.</p>
+          <div class="mt-8 border-t border-ink/10 pt-6">
+            <p class="text-sm font-bold text-forest">Dikembangkan untuk</p>
+            <p class="mt-2 text-sm leading-6 text-ink/60">Program Adiwiyata Mandiri Stembayo · SMK Negeri 2 Depok Sleman</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-ink px-5 py-10 text-white sm:px-8 lg:px-10">
+    <div class="mx-auto flex max-w-7xl flex-col gap-8 sm:flex-row sm:items-end sm:justify-between">
+      <div>
+        <a href="#beranda" class="inline-flex items-center gap-3" aria-label="SORTIVA, kembali ke beranda">
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-fern text-mint"><i class="fa-solid fa-leaf text-sm" aria-hidden="true"></i></span>
+          <span class="font-display text-xl font-extrabold tracking-tight">SORTIVA</span>
+        </a>
+        <p class="mt-3 max-w-sm text-sm leading-6 text-white/55">Aplikasi klasifikasi sampah berbasis machine learning untuk pembelajaran lingkungan di Stembayo.</p>
+      </div>
+      <div class="flex flex-wrap gap-x-6 gap-y-3 text-sm font-semibold text-white/65">
+        <a href="Konsol Kamera.html" class="transition hover:text-mint">Konsol Kamera</a>
+        <a href="dashboard.html" class="transition hover:text-mint">Dashboard Analitik</a>
+        <a href="#cara-kerja" class="transition hover:text-mint">Cara Kerja</a>
+      </div>
+    </div>
+    <div class="mx-auto mt-8 max-w-7xl border-t border-white/10 pt-5 text-xs text-white/40">© 2026 SORTIVA · SMK Negeri 2 Depok Sleman</div>
+  </footer>
+
+  <script>
+    const page = document.body;
+    const menuToggle = document.getElementById('menu-toggle');
+    const mobileMenu = document.getElementById('mobile-menu');
+    const header = document.getElementById('site-header');
+
+    menuToggle.addEventListener('click', () => {
+      const isOpen = page.classList.toggle('menu-open');
+      menuToggle.setAttribute('aria-expanded', String(isOpen));
+      menuToggle.setAttribute('aria-label', isOpen ? 'Tutup menu' : 'Buka menu');
+      mobileMenu.classList.toggle('hidden', !isOpen);
+    });
+
+    mobileMenu.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        page.classList.remove('menu-open');
+        mobileMenu.classList.add('hidden');
+        menuToggle.setAttribute('aria-expanded', 'false');
+        menuToggle.setAttribute('aria-label', 'Buka menu');
+      });
+    });
+
+    window.addEventListener('scroll', () => {
+      header.classList.toggle('border-ink/10', window.scrollY > 8);
+      header.classList.toggle('shadow-sm', window.scrollY > 8);
+    }, { passive: true });
+  </script>
+</body>
+</html>

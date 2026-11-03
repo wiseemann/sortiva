@@ -2,8 +2,12 @@
 scripts/prepare_kaggle_dataset.py
 ─────────────────────────────────
 Downloads and prepares the Mostafa Abla Garbage Classification dataset
-directly on the VPS, mapping 12 classes to SORTIVA's 8 Adiwiyata classes
-and generating YOLO bounding boxes (pseudo-labels).
+directly on the VPS, mapping 12 classes to SORTIVA's 8 Adiwiyata classes.
+
+Important: this source is an image-classification dataset. It does not
+contain object coordinates, so it must not be used as a YOLO detection
+dataset by default. The old pseudo-label mode is retained only for explicit
+experiments and is expected to produce full-frame detections.
 
 Mapping:
   - biological                     → organic_waste (class 7)
@@ -17,6 +21,8 @@ Mapping:
 
 Usage (run on VPS):
   python scripts/prepare_kaggle_dataset.py --kaggle-dir /path/to/extracted/garbage_classification
+  # Legacy experiment only:
+  python scripts/prepare_kaggle_dataset.py --kaggle-dir /path/to/data --allow-pseudo-boxes
 """
 
 import argparse
@@ -44,7 +50,17 @@ CLASS_MAP = {
 IGNORE_CLASSES = {"clothes", "shoes", "trash"}
 
 
-def prepare_dataset(source_dir: Path, max_per_class: int = 1000, val_ratio: float = 0.15, test_ratio: float = 0.10):
+def prepare_dataset(source_dir: Path, max_per_class: int = 1000,
+                    val_ratio: float = 0.15, test_ratio: float = 0.10,
+                    allow_pseudo_boxes: bool = False):
+    if not allow_pseudo_boxes:
+        raise RuntimeError(
+            "Dataset Kaggle ini hanya memiliki label level-gambar, bukan "
+            "bounding box. Pembuatan pseudo-label YOLO dinonaktifkan karena "
+            "akan membuat model mendeteksi seluruh frame. Gunakan anotasi "
+            "bounding box nyata, atau tambahkan --allow-pseudo-boxes hanya "
+            "untuk eksperimen yang tidak dipakai di production."
+        )
     print(f"\n{'='*60}")
     print(f"  Preparing Dataset from: {source_dir}")
     print(f"  Target directory     : {OUTPUT_DIR}")
@@ -103,7 +119,13 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--kaggle-dir", type=str, required=True, help="Path to unzipped Kaggle dataset")
     parser.add_argument("--max-per-class", type=int, default=1000)
+    parser.add_argument("--allow-pseudo-boxes", action="store_true",
+                        help="Allow legacy 85%% full-frame pseudo-labels (not production-safe)")
     args = parser.parse_args()
 
-    prepare_dataset(Path(args.kaggle_dir), max_per_class=args.max_per_class)
+    prepare_dataset(
+        Path(args.kaggle_dir),
+        max_per_class=args.max_per_class,
+        allow_pseudo_boxes=args.allow_pseudo_boxes,
+    )
 

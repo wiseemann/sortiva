@@ -53,6 +53,11 @@ CLASS_NAMES = [
     "organic_waste",  # 7
 ]
 
+try:
+    from dataset_checks import validate_yolo_dataset
+except ImportError:
+    from scripts.dataset_checks import validate_yolo_dataset
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Step 1  —  write data.yaml with absolute paths (works from any cwd)
@@ -245,6 +250,13 @@ def main():
 
     # ── write data.yaml ───────────────────────────────────────────────────────
     data_yaml = write_data_yaml()
+
+    try:
+        stats = validate_yolo_dataset(DATASET_DIR)
+        print(f"  Dataset validation : OK ({stats['train']['boxes']} train boxes)")
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
 
     # ── clean labels ──────────────────────────────────────────────────────────
     n = clean_labels()

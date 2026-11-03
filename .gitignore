@@ -25,6 +25,9 @@ data/
 # ── Model weights (too large for git) ────────────────────────────────────────
 # *.pt
 # *.pth
+models/*_baseline*.pt
+models/*_s*.pt
+models/*_old*.pt
 
 # ── Training run artefacts ────────────────────────────────────────────────────
 runs/

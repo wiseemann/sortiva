@@ -19,6 +19,7 @@ Usage (from project root, venv active):
     python scripts/finetune_stembayo.py --stage 2 --epochs 20
     python scripts/finetune_stembayo.py --stage both
     python scripts/finetune_stembayo.py --stage both --promote
+    python scripts/finetune_stembayo.py --pretrained models/best_baseline_v0.pt
 """
 
 import argparse
@@ -39,6 +40,11 @@ CLASS_NAMES = [
     "medical_waste", "paper", "cardboard", "organic_waste",
 ]
 
+try:
+    from dataset_checks import validate_yolo_dataset
+except ImportError:
+    from scripts.dataset_checks import validate_yolo_dataset
+
 
 def write_data_yaml() -> Path:
     """Write data.yaml with absolute paths."""
@@ -56,7 +62,8 @@ def write_data_yaml() -> Path:
     return yaml_path
 
 
-def run_stage1(data_yaml: Path, epochs: int, device, promote: bool = False):
+def run_stage1(data_yaml: Path, epochs: int, device, promote: bool = False,
+               pretrained_path: Path | None = None):
     """Stage 1: Full model fine-tune with low LR."""
     from ultralytics import YOLO
 
@@ -64,9 +71,11 @@ def run_stage1(data_yaml: Path, epochs: int, device, promote: bool = False):
     print(f"  Stage 1 — Full Fine-Tune (lr=0.0001)")
     print(f"{'═'*62}")
 
-    model_path = MODEL_DIR / "best.pt"
+    model_path = pretrained_path or MODEL_DIR / "best_baseline_v0.pt"
     if not model_path.exists():
-        print(f"ERROR: best.pt not found at {model_path}")
+        model_path = MODEL_DIR / "best.pt"
+    if not model_path.exists():
+        print(f"ERROR: pretrained model not found at {model_path}")
         print(f"  → Train a base model first with: python scripts/train_yolov8m.py")
         sys.exit(1)
 
@@ -221,6 +230,8 @@ def main():
                         help="Override epoch count (default: 30 for s1, 20 for s2)")
     parser.add_argument("--promote", action="store_true",
                         help="Copy the final candidate over models/best.pt after training")
+    parser.add_argument("--pretrained", type=Path, default=None,
+                        help="Base checkpoint; defaults to models/best_baseline_v0.pt when present")
     args = parser.parse_args()
 
     try:
@@ -242,9 +253,16 @@ def main():
 
     data_yaml = write_data_yaml()
 
+    try:
+        stats = validate_yolo_dataset(DATASET_DIR)
+        print(f"  Dataset validation : OK ({stats['train']['boxes']} train boxes)")
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"ERROR: {exc}")
+        sys.exit(1)
+
     if args.stage in ("1", "both"):
         epochs = args.epochs or 30
-        run_stage1(data_yaml, epochs, device, args.promote)
+        run_stage1(data_yaml, epochs, device, args.promote, args.pretrained)
 
     if args.stage in ("2", "both"):
         epochs = args.epochs or 20
