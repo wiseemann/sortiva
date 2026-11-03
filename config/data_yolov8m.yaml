@@ -1,4 +1,6 @@
-path: C:\Users\Chirag\Downloads\Ai-powered-Waste-Classification-and-Segregation-main\Ai-powered-Waste-Classification-and-Segregation-main\YOLOV8M\datasets\balanced_v3
+# Dataset path is relative to this config file so the project works on any
+# machine. Override it with --data when using a different dataset location.
+path: ../YOLOV8M/datasets/balanced_v3
 train: train/images
 val: valid/images
 test: test/images

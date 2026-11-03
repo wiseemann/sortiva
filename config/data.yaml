@@ -1,17 +1,26 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# SORTIVA Waste Dataset Configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# 8-class Adiwiyata waste classification aligned with 3-Compartment System:
+#   Organik (Hijau)     : organic_waste
+#   Daur Ulang (Kuning) : plastic, metal, glass, paper, cardboard
+#   Residu / B3 (Merah) : e_waste, medical_waste
+#
+# NOTE: 'can' and 'cable' from the original 10-class merge have been
+#       consolidated into 'metal' and 'e_waste' respectively.
+# ─────────────────────────────────────────────────────────────────────────────
 path: datasets/merged
 train: train/images
 val: valid/images
 test: test/images
 
-nc: 10
+nc: 8
 names:
   0: plastic
   1: metal
   2: glass
-  3: can
-  4: cable
-  5: e_waste
-  6: medical_waste
-  7: paper
-  8: cardboard
-  9: organic_waste
+  3: e_waste
+  4: medical_waste
+  5: paper
+  6: cardboard
+  7: organic_waste

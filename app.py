@@ -7,31 +7,21 @@ import streamlit as st
 from ultralytics import YOLO
 from PIL import Image, ImageOps
 import cv2
-<<<<<<< HEAD
-=======
-import torch
-import torch.nn as nn
-from torchvision import models, transforms
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-from database import save_detections
+from database import save_detections, save_to_review_queue
 
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 # Page configuration
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="SWMS — Smart Waste Management System | Government of India",
-    page_icon="🇮🇳",
+    page_title="SORTIVA — The Stembayo Eco-Sort Platform | SMKN 2 Depok Sleman",
+    page_icon="🌱",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
-# ─────────────────────────────────────────────
-<<<<<<< HEAD
+# ─────────────────────────────────────────────────────────────────────────────
 # Load YOLO model
-#   Put the trained YOLOv8m file at:  models/best.pt
-#   The cache key includes the file's modified time, so replacing
-#   best.pt is picked up automatically (no stale old model).
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
 BASE_DIR   = os.path.dirname(os.path.abspath(__file__))
 MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
 
@@ -39,55 +29,12 @@ MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
 @st.cache_resource
 def load_model(path: str, mtime: float):
     if not os.path.exists(path):
-        st.error(f"Model file not found: {path}")
-=======
-# Paths
-# ─────────────────────────────────────────────
-BASE_DIR         = os.path.dirname(os.path.abspath(__file__))
-MODEL_PATH       = os.path.join(BASE_DIR, "models", "best.pt")
-RESNET_PATH      = os.path.join(BASE_DIR, "models", "resnet50_waste.pth")
-
-# ─────────────────────────────────────────────
-# ResNet50 — class mapping (must match train_resnet50.py)
-# ─────────────────────────────────────────────
-RESNET_CLASS_NAMES = {
-    0: "plastic",
-    1: "metal",
-    2: "glass",
-    3: "e_waste",
-    4: "medical_waste",
-    5: "paper",
-    6: "cardboard",
-    7: "organic_waste",
-}
-NUM_RESNET_CLASSES = len(RESNET_CLASS_NAMES)
-
-# ImageNet normalisation for ResNet50 inference
-_RESNET_TF = transforms.Compose([
-    transforms.Resize((224, 224)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225]),
-])
-
-# ─────────────────────────────────────────────
-# Load YOLOv8m  (detection — bounding boxes only)
-#   Cache key includes mtime so swapping best.pt is picked up automatically.
-# ─────────────────────────────────────────────
-@st.cache_resource
-def load_model(path: str, mtime: float):
-    if not os.path.exists(path):
-        st.error(f"YOLO model file not found: {path}")
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
+        st.error(f"Berkas model tidak ditemukan: {path}")
         return None
     try:
         return YOLO(path)
     except Exception as e:
-<<<<<<< HEAD
-        st.error(f"Error loading model: {e}")
-=======
-        st.error(f"Error loading YOLO model: {e}")
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
+        st.error(f"Gagal memuat model YOLO: {e}")
         return None
 
 
@@ -96,145 +43,210 @@ model = load_model(
     os.path.getmtime(MODEL_PATH) if os.path.exists(MODEL_PATH) else 0.0,
 )
 
-# ─────────────────────────────────────────────
-<<<<<<< HEAD
-=======
-# Load ResNet50  (classification — crop → class label)
-# ─────────────────────────────────────────────
-@st.cache_resource
-def load_resnet(path: str, mtime: float):
-    """
-    Builds the same ResNet50 architecture used in train_resnet50.py,
-    loads the saved weights, and returns the model in eval mode.
-    Returns None (with a sidebar warning) if the checkpoint is absent.
-    """
-    if not os.path.exists(path):
-        return None          # caller shows the warning
-
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    net = models.resnet50(weights=None)
-    net.fc = nn.Sequential(
-        nn.Dropout(p=0.4),
-        nn.Linear(net.fc.in_features, 512),
-        nn.ReLU(inplace=True),
-        nn.Dropout(p=0.3),
-        nn.Linear(512, NUM_RESNET_CLASSES),
-    )
-    try:
-        ckpt = torch.load(path, map_location=device)
-        net.load_state_dict(ckpt["model_state_dict"])
-        net.to(device)
-        net.eval()
-        return net
-    except Exception as e:
-        st.error(f"Error loading ResNet50: {e}")
-        return None
-
-
-resnet_model = load_resnet(
-    RESNET_PATH,
-    os.path.getmtime(RESNET_PATH) if os.path.exists(RESNET_PATH) else 0.0,
-)
-
-_RESNET_DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-
-def classify_crop_resnet(crop_pil: Image.Image) -> tuple[str, float]:
-    """
-    Run ResNet50 on a PIL crop and return (class_name, confidence).
-    Falls back to 'unknown' if ResNet50 is not loaded.
-    """
-    if resnet_model is None:
-        return "unknown", 0.0
-    tensor = _RESNET_TF(crop_pil).unsqueeze(0).to(_RESNET_DEVICE)
-    with torch.no_grad():
-        logits = resnet_model(tensor)
-        probs  = torch.softmax(logits, dim=1)[0]
-        top1   = int(probs.argmax())
-        conf   = float(probs[top1])
-    return RESNET_CLASS_NAMES.get(top1, "unknown"), conf
-
-# ─────────────────────────────────────────────
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-# Waste categories — 8 classes matching the YOLOv8m model
-# (removed 'can' and 'cable' from the old 10-class system —
-#  'can' folds into 'metal', 'cable' folds into 'e_waste')
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Waste categories — 8 classes aligned with Adiwiyata 3-Compartment System
+# Kompartemen Adiwiyata:
+# 1. Organik (Hijau)       : Sampah mudah terurai / sisa organik
+# 2. Daur Ulang (Kuning/Biru): Plastik, Kertas, Karton, Kaleng Logam, Botol Kaca
+# 3. Residu / B3 (Merah)   : Limbah medis, elektronik, berbahaya
+# ─────────────────────────────────────────────────────────────────────────────
 WASTE_CATEGORIES = {
-    'plastic':       {'color': (144, 116, 14),  'hex': '#0E7490', 'icon': '♻️',  'bin': 'Yellow Bin',  'schedule': 'Sch. I(a)', 'description': 'Recyclable plastic items',    'nature': 'Non-Biodegradable'},
-    'metal':         {'color': (9, 83, 180),    'hex': '#B45309', 'icon': '🔩',  'bin': 'Blue Bin',    'schedule': 'Sch. I(b)', 'description': 'Metal cans, scrap and items',  'nature': 'Non-Biodegradable'},
-    'glass':         {'color': (110, 118, 15),  'hex': '#0F766E', 'icon': '🍾',  'bin': 'Green Bin',   'schedule': 'Sch. I(c)', 'description': 'Glass bottles and containers', 'nature': 'Non-Biodegradable'},
-    'e_waste':       {'color': (18, 45, 124),   'hex': '#7C2D12', 'icon': '💻',  'bin': 'E-Waste Bin', 'schedule': 'Sch. II(a)','description': 'Electronic waste and cables',  'nature': 'Non-Biodegradable'},
-    'medical_waste': {'color': (28, 28, 185),   'hex': '#B91C1C', 'icon': '💉',  'bin': 'Red Bin',     'schedule': 'Sch. III',  'description': 'Medical and hazardous waste',  'nature': 'Hazardous'},
-    'paper':         {'color': (216, 78, 29),   'hex': '#1D4ED8', 'icon': '📄',  'bin': 'Blue Bin',    'schedule': 'Sch. IV(a)','description': 'Paper and documents',          'nature': 'Biodegradable'},
-    'cardboard':     {'color': (15, 53, 120),   'hex': '#78350F', 'icon': '📦',  'bin': 'Blue Bin',    'schedule': 'Sch. IV(b)','description': 'Cardboard boxes',              'nature': 'Biodegradable'},
-    'organic_waste': {'color': (61, 128, 21),   'hex': '#15803D', 'icon': '🍃',  'bin': 'Green Bin',   'schedule': 'Sch. IV(c)','description': 'Biodegradable waste',          'nature': 'Biodegradable'},
+    'organic_waste': {
+        'color': (89, 124, 74),
+        'hex': '#4A7C59',
+        'icon': '🍃',
+        'mat_icon': 'compost',
+        'bin': 'WADAH ORGANIK',
+        'bin_color': '#4A7C59',
+        'category': 'Organik',
+        'material_sub': 'Limbah Biomassa & Sisa Organik',
+        'description': 'Sisa makanan, dedaunan, kulit buah & sampah organik terurai',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 1 (Hijau). Cocok untuk dekomposisi komposter Stembayo.',
+        'nature': 'Biodegradable'
+    },
+    'paper': {
+        'color': (235, 99, 37),
+        'hex': '#2563EB',
+        'icon': '📄',
+        'mat_icon': 'description',
+        'bin': 'WADAH DAUR ULANG',
+        'bin_color': '#2563EB',
+        'category': 'Daur Ulang',
+        'material_sub': 'Serat Selulosa & Kertas Arsip',
+        'description': 'Kertas tulis, lembaran buku & dokumen tanpa laminasi plastik',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 2 (Kuning/Biru). Pastikan dalam kondisi kering tanpa staples.',
+        'nature': 'Biodegradable'
+    },
+    'cardboard': {
+        'color': (48, 92, 112),
+        'hex': '#705C30',
+        'icon': '📦',
+        'mat_icon': 'inventory_2',
+        'bin': 'WADAH DAUR ULANG',
+        'bin_color': '#705C30',
+        'category': 'Daur Ulang',
+        'material_sub': 'Karton Kemasan & Kotak Boks',
+        'description': 'Kardus boks, karton kemasan tebal & paper bag kering',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 2 (Kuning/Biru). Lipat kardus hingga pipih sebelum dimasukkan.',
+        'nature': 'Biodegradable'
+    },
+    'plastic': {
+        'color': (106, 166, 196),
+        'hex': '#C4A66A',
+        'icon': '♻️',
+        'mat_icon': 'water_bottle',
+        'bin': 'WADAH DAUR ULANG',
+        'bin_color': '#C4A66A',
+        'category': 'Daur Ulang',
+        'material_sub': 'Polietilena Tereftalat (PET / HDPE)',
+        'description': 'Botol plastik PET, gelas minuman, wadah bersih & kresek',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 2 (Kuning/Biru). Lepas tutup botol dan remas sebelum dimasukkan.',
+        'nature': 'Non-Biodegradable'
+    },
+    'metal': {
+        'color': (88, 99, 107),
+        'hex': '#6B6358',
+        'icon': '🥫',
+        'mat_icon': 'lunch_dining',
+        'bin': 'WADAH DAUR ULANG',
+        'bin_color': '#6B6358',
+        'category': 'Daur Ulang',
+        'material_sub': 'Aluminium & Logam Kaleng',
+        'description': 'Kaleng minuman, kemasan aluminium, tutup botol & perkakas logam',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 2 (Kuning/Biru). Kosongkan cairan sebelum dimasukkan.',
+        'nature': 'Non-Biodegradable'
+    },
+    'glass': {
+        'color': (104, 122, 94),
+        'hex': '#5E7A68',
+        'icon': '🍾',
+        'mat_icon': 'wine_bar',
+        'bin': 'WADAH DAUR ULANG',
+        'bin_color': '#5E7A68',
+        'category': 'Daur Ulang',
+        'material_sub': 'Kaca Silika & Botol Kaca',
+        'description': 'Botol kaca utuh, toples kaca & pecahan beling kemasan',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 2 (Kuning/Biru). Masukkan hati-hati agar tidak pecah.',
+        'nature': 'Non-Biodegradable'
+    },
+    'e_waste': {
+        'color': (48, 92, 112),
+        'hex': '#705C30',
+        'icon': '⚡',
+        'mat_icon': 'cable',
+        'bin': 'WADAH RESIDU & B3',
+        'bin_color': '#705C30',
+        'category': 'Residu / B3',
+        'material_sub': 'Limbah Komponen Elektronika (E-Waste)',
+        'description': 'Kabel listrik, baterai, adaptor bekas & komponen elektronika',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 3 (Merah). Disalurkan ke TPS B3 bengkel elektro Stembayo.',
+        'nature': 'Non-Biodegradable'
+    },
+    'medical_waste': {
+        'color': (48, 50, 184),
+        'hex': '#B83230',
+        'icon': '⚠️',
+        'mat_icon': 'medical_services',
+        'bin': 'WADAH RESIDU & B3',
+        'bin_color': '#B83230',
+        'category': 'Residu / B3',
+        'material_sub': 'Limbah Medis & Infeksius Berbahaya',
+        'description': 'Masker sekali pakai, perban, jarum suntik & limbah medis berbahaya',
+        'rotor_instruction': 'Motor servo mengarahkan kompartemen 3 (Merah). Masukkan ke kantong khusus limbah B3/UKS.',
+        'nature': 'Hazardous'
+    },
 }
 
 DEFAULT_CATEGORY = {
-    'color': (128, 114, 107), 'hex': '#6B7280',
-    'icon': '🗑️', 'bin': 'General Bin', 'schedule': 'Sch. V', 'description': 'Unclassified waste type', 'nature': 'Unknown'
+    'color': (88, 99, 107),
+    'hex': '#6B6358',
+    'icon': '🗑️',
+    'mat_icon': 'delete',
+    'bin': 'WADAH RESIDU UMUM',
+    'bin_color': '#6B6358',
+    'category': 'Residu',
+    'material_sub': 'Objek Tidak Terklasifikasi',
+    'description': 'Objek belum terklasifikasi secara pasti oleh model visi',
+    'rotor_instruction': 'Motor servo dalam mode siaga (standby). Arahkan objek ke posisi tengah inspeksi.',
+    'nature': 'Unknown'
 }
 
-# Nature badge colours — light tints for a paper-white interface
+# Nature badge styles with strong, verified contrast matching Stembayo Eco-Tech tokens
 NATURE_COLORS = {
-    'Biodegradable':     {'bg': '#ECFDF3', 'text': '#15803D', 'border': '#86EFAC'},
-    'Non-Biodegradable': {'bg': '#FFF7ED', 'text': '#C2410C', 'border': '#FDBA74'},
-    'Hazardous':         {'bg': '#FEF2F2', 'text': '#B91C1C', 'border': '#FCA5A5'},
-    'Unknown':           {'bg': '#F3F4F6', 'text': '#4B5563', 'border': '#D1D5DB'},
+    'Biodegradable':     {'bg': '#C8E8D0', 'text': '#2A6038', 'border': '#A5D6B2'},
+    'Non-Biodegradable': {'bg': '#F0E8DB', 'text': '#4A4538', 'border': '#D4CCBF'},
+    'Hazardous':         {'bg': '#FFDAD8', 'text': '#690005', 'border': '#F5A9A7'},
+    'Unknown':           {'bg': '#F5F1EA', 'text': '#2E3230', 'border': '#E4E0D8'},
 }
 
 
 def check_model_classes(yolo_model):
-    """
-    Compares the classes inside the loaded model with the 8 classes this app
-    knows about. Returns (ok, message). The app looks classes up by NAME, so
-    a different order is harmless.
-    """
     expected = set(WASTE_CATEGORIES.keys())
     names = [normalize_class(yolo_model.names[i]) for i in range(len(yolo_model.names))]
     missing = sorted(expected - set(names))
     extra   = sorted(set(names) - expected)
     if not missing and not extra:
         return True, ""
-    msg = f"This model has {len(names)} classes, but the app expects {len(expected)}. "
+    msg = f"Model ini memiliki {len(names)} kelas, sementara sistem mengonfigurasi {len(expected)}. "
     if missing:
-        msg += f"Missing: {', '.join(missing)}. "
+        msg += f"Kelas hilang: {', '.join(missing)}. "
     if extra:
-        msg += f"Not in the app's list: {', '.join(extra)}. "
-    msg += "Make sure models/best.pt is the new YOLOv8m 8-class file."
+        msg += f"Kelas tambahan: {', '.join(extra)}. "
+    msg += "Pastikan models/best.pt adalah model YOLOv8m 8-kelas yang sesuai."
     return False, msg
 
 
 def conf_band(c: float) -> str:
-    return "High" if c >= 0.50 else ("Medium" if c >= 0.25 else "Low")
+    return "Tinggi" if c >= 0.50 else ("Sedang" if c >= 0.25 else "Rendah")
 
 
-def ref_number(seed: int, prefix: str = "WMS") -> str:
-    """Generates a gazette-style reference number, e.g. WMS/2026/48213."""
-    return f"{prefix}/2026/{(seed * 733 + 1009) % 90000 + 10000}"
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-class confidence thresholds — Phase 4 accuracy improvement
+# Classes with high false-positive risk get higher thresholds.
+# ─────────────────────────────────────────────────────────────────────────────
+PER_CLASS_CONF = {
+    'paper':         0.55,
+    'medical_waste': 0.60,
+    'e_waste':       0.55,
+    'organic_waste': 0.35,
+    'plastic':       0.35,
+    'cardboard':     0.35,
+    'metal':         0.40,
+    'glass':         0.40,
+}
+
+UNCERTAIN_THRESHOLD = 0.40   # below this → "Butuh Verifikasi Manual"
+
+
+def _apply_per_class_filter(detections):
+    """Filter detections using per-class confidence thresholds and flag uncertain."""
+    filtered = []
+    for d in detections:
+        cls_name = d['class']
+        min_conf = PER_CLASS_CONF.get(cls_name, 0.35)
+        if d['confidence'] >= min_conf:
+            d['uncertain'] = False
+            filtered.append(d)
+        elif d['confidence'] >= 0.25:
+            # Anything below its class threshold is uncertain, including the
+            # interval between UNCERTAIN_THRESHOLD and the class threshold.
+            d['uncertain'] = True
+            filtered.append(d)
+        # Below 0.25 → drop entirely
+    return filtered
+
+
+def ref_number(seed: int, prefix: str = "ADW") -> str:
+    return f"{prefix}-{(seed * 733 + 1009) % 90000 + 10000}"
 
 
 def open_camera(index: int) -> cv2.VideoCapture:
-    """
-    Opens a camera with the correct backend for the current OS.
-    cv2.CAP_DSHOW is Windows-only and silently fails to open a camera
-    on Linux/Mac, so pick a sane backend per platform instead of
-    hardcoding one.
-
-    On Windows, CAP_DSHOW can hang or throw on some webcam drivers
-    (especially when re-opening a different index right after another
-    camera was released). If it fails to open, fall back to CAP_MSMF,
-    and finally to the default backend, instead of letting the
-    exception propagate and kill the whole Streamlit script run.
-    """
     system = platform.system()
-
     if system == "Windows":
         backends_to_try = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
     elif system == "Linux":
         backends_to_try = [cv2.CAP_V4L2, cv2.CAP_ANY]
-    else:  # macOS and anything else
+    else:
         backends_to_try = [cv2.CAP_ANY]
 
     for backend in backends_to_try:
@@ -245,74 +257,34 @@ def open_camera(index: int) -> cv2.VideoCapture:
             if cap is not None:
                 cap.release()
         except Exception:
-            # Some backend/driver combinations raise instead of just
-            # failing to open — keep trying the next backend rather
-            # than letting this bubble up and crash the app.
             continue
-
-    # Nothing worked — return a capture object that reports as not
-    # opened, so the caller's existing `if not cap.isOpened():` check
-    # handles it gracefully instead of raising.
     return cv2.VideoCapture()
 
 
-# ─────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────
 def normalize_class(name) -> str:
-    """'Organic Waste' / 'organic-waste' / 'E-Waste' -> 'organic_waste' / 'e_waste'."""
     n = str(name).strip().lower().replace("-", "_").replace(" ", "_")
-    aliases = {"ewaste": "e_waste", "e_waste": "e_waste", "organic": "organic_waste",
-               "medical": "medical_waste", "biodegradable": "organic_waste"}
+    aliases = {
+        "ewaste": "e_waste",
+        "e_waste": "e_waste",
+        "organic": "organic_waste",
+        "medical": "medical_waste",
+        "biodegradable": "organic_waste"
+    }
     return aliases.get(n, n)
 
 
-<<<<<<< HEAD
 def _extract(result):
     dets = []
-    # Classification model (yolov8-cls): no boxes, only class probabilities
     probs = getattr(result, "probs", None)
     if probs is not None:
         cname = normalize_class(result.names[int(probs.top1)])
         dets.append({
             'class':         cname,
             'confidence':    float(probs.top1conf),
-=======
-def _extract(result, source_image: Image.Image | None = None):
-    """
-    Extract detections from a YOLO result.
-
-    Two-stage pipeline:
-      1. YOLOv8m provides bounding boxes (where the waste is).
-      2. ResNet50 classifies each cropped region (what class it is).
-
-    If ResNet50 is not loaded yet (e.g. model file missing), the class
-    label from YOLO's own head is used as a fallback so the app still
-    works before training is complete.
-
-    source_image: the original PIL image, needed to crop boxes for ResNet50.
-                  Pass None to skip ResNet50 classification (YOLO-only fallback).
-    """
-    dets = []
-
-    # ── Classification model (yolov8-cls): no boxes, only class probs ──
-    probs = getattr(result, "probs", None)
-    if probs is not None:
-        cname = normalize_class(result.names[int(probs.top1)])
-        # Even for a cls model, try ResNet50 on the whole image
-        if source_image is not None and resnet_model is not None:
-            cname, conf = classify_crop_resnet(source_image)
-        else:
-            conf = float(probs.top1conf)
-        dets.append({
-            'class':         cname,
-            'confidence':    conf,
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
             'category_info': WASTE_CATEGORIES.get(cname, DEFAULT_CATEGORY),
             'xyxy':          None,
         })
         return dets
-<<<<<<< HEAD
     if result.boxes is None or len(result.boxes) == 0:
         return dets
     for box in result.boxes:
@@ -322,67 +294,17 @@ def _extract(result, source_image: Image.Image | None = None):
             'confidence':    float(box.conf[0]),
             'category_info': WASTE_CATEGORIES.get(cname, DEFAULT_CATEGORY),
             'xyxy':          [int(v) for v in box.xyxy[0].tolist()],
-=======
-
-    # ── Detection model: use YOLO boxes + ResNet50 classification ───
-    if result.boxes is None or len(result.boxes) == 0:
-        return dets
-
-    W = H = None
-    if source_image is not None:
-        W, H = source_image.size
-
-    for box in result.boxes:
-        xyxy = [int(v) for v in box.xyxy[0].tolist()]
-
-        # ── ResNet50 classification on the cropped region ────────────
-        if source_image is not None and resnet_model is not None and W and H:
-            x1, y1, x2, y2 = xyxy
-            # 10px padding, clamped to image bounds
-            pad = 10
-            x1c = max(0,     x1 - pad)
-            y1c = max(0,     y1 - pad)
-            x2c = min(W - 1, x2 + pad)
-            y2c = min(H - 1, y2 + pad)
-            if x2c > x1c and y2c > y1c:
-                crop  = source_image.crop((x1c, y1c, x2c, y2c))
-                cname, conf = classify_crop_resnet(crop)
-            else:
-                cname = normalize_class(result.names.get(int(box.cls[0]), str(int(box.cls[0]))))
-                conf  = float(box.conf[0])
-        else:
-            # Fallback: use YOLO's own class prediction
-            cname = normalize_class(result.names.get(int(box.cls[0]), str(int(box.cls[0]))))
-            conf  = float(box.conf[0])
-
-        dets.append({
-            'class':         cname,
-            'confidence':    conf,
-            'category_info': WASTE_CATEGORIES.get(cname, DEFAULT_CATEGORY),
-            'xyxy':          xyxy,
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
         })
     return dets
 
 
 def classify_image(image, conf_threshold=0.25):
-<<<<<<< HEAD
-    """Runs YOLO on a PIL image. If nothing is found, retries once at a lower
-    confidence so a weak-but-correct prediction is not silently dropped."""
-    results = model(image, conf=conf_threshold, imgsz=640, iou=0.5, max_det=100, verbose=False)
+    results = model(image, conf=conf_threshold, imgsz=640, iou=0.5, max_det=100, augment=True, verbose=False)
     detections = [d for r in results for d in _extract(r)]
-    if not detections and conf_threshold > 0.10:
-        results = model(image, conf=0.10, imgsz=640, verbose=False)
+    if not detections and conf_threshold > 0.30:
+        results = model(image, conf=0.30, imgsz=640, augment=True, verbose=False)
         detections = [d for r in results for d in _extract(r)]
-=======
-    """Runs YOLO on a PIL image for boxes, then ResNet50 on each crop.
-    If nothing is found, retries once at a lower confidence."""
-    results = model(image, conf=conf_threshold, imgsz=640, iou=0.5, max_det=100, verbose=False)
-    detections = [d for r in results for d in _extract(r, source_image=image)]
-    if not detections and conf_threshold > 0.10:
-        results = model(image, conf=0.10, imgsz=640, verbose=False)
-        detections = [d for r in results for d in _extract(r, source_image=image)]
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
+    detections = _apply_per_class_filter(detections)
     return results, detections
 
 
@@ -395,7 +317,6 @@ def _iou(a, b):
 
 
 def _nms(dets, iou_thr=0.5, keep=30):
-    """Class-wise non-max suppression; keeps the strongest of overlapping same-class boxes."""
     dets = sorted(dets, key=lambda d: -d['confidence'])
     kept = []
     for d in dets:
@@ -409,33 +330,13 @@ def _nms(dets, iou_thr=0.5, keep=30):
     return kept[:keep]
 
 
-def detect_multiscale(image, conf):
-    """
-<<<<<<< HEAD
-    Runs the model on the whole photo AND on four overlapping zoomed-in tiles,
-    then merges the results. Cluttered photos hold many small objects, and zooming
-    in lets the model consider each region on its own. Returns every prediction
-    (even very low confidence) so the report can list them all.
-=======
-    Runs YOLO on the full photo AND on four overlapping 60%-size tiles,
-    then classifies each crop with ResNet50 and merges via NMS.
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-    """
+def detect_multiscale(image, conf, apply_filter=False):
     W, H = image.size
 
     def run(img, ox, oy):
-<<<<<<< HEAD
         out = []
-        for r in model(img, conf=conf, imgsz=640, iou=0.5, max_det=100, verbose=False):
+        for r in model(img, conf=conf, imgsz=640, iou=0.5, max_det=100, augment=True, verbose=False):
             out += _extract(r)
-=======
-        """Run YOLO on img, offset boxes by (ox, oy), classify crops with ResNet50."""
-        out = []
-        pil_img = img if isinstance(img, Image.Image) else Image.fromarray(img)
-        for r in model(pil_img, conf=conf, imgsz=640, iou=0.5, max_det=100, verbose=False):
-            out += _extract(r, source_image=pil_img)
-        # Shift box coordinates back to original image space
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
         for d in out:
             if d['xyxy'] is not None:
                 x1, y1, x2, y2 = d['xyxy']
@@ -447,17 +348,12 @@ def detect_multiscale(image, conf):
         tw, th = int(W * 0.6), int(H * 0.6)
         for ox in (0, W - tw):
             for oy in (0, H - th):
-<<<<<<< HEAD
                 dets += run(image.crop((ox, oy, ox + tw, oy + th)), ox, oy)
-=======
-                tile = image.crop((ox, oy, ox + tw, oy + th))
-                dets += run(tile, ox, oy)
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-    return _nms(dets)
+    dets = _nms(dets)
+    return _apply_per_class_filter(dets) if apply_filter else dets
 
 
 def draw_detections(image, detections):
-    """Draws every prediction on a copy of the photo. Returns an RGB numpy array."""
     import numpy as np
     canvas = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
     for i, d in enumerate(detections):
@@ -476,39 +372,14 @@ def draw_detections(image, detections):
 
 
 def debug_predictions(image):
-<<<<<<< HEAD
-    """Raw top predictions at a very low confidence, to see what the model 'thinks'."""
     res = model(image, conf=0.001, imgsz=640, verbose=False)
     rows = [(d['class'], round(d['confidence'], 3)) for r in res for d in _extract(r)]
-=======
-    """Raw top predictions at a very low confidence, to see what the model 'thinks'.
-    Uses YOLO-only (no ResNet50) so the raw YOLO output is visible for diagnostics."""
-    res = model(image, conf=0.001, imgsz=640, verbose=False)
-    rows = []
-    for r in res:
-        for box in (r.boxes or []):
-            cname = normalize_class(r.names.get(int(box.cls[0]), str(int(box.cls[0]))))
-            rows.append((cname, round(float(box.conf[0]), 3)))
-        probs = getattr(r, "probs", None)
-        if probs is not None:
-            cname = normalize_class(r.names[int(probs.top1)])
-            rows.append((cname, round(float(probs.top1conf), 3)))
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
     rows.sort(key=lambda x: -x[1])
     return rows[:8]
 
 
-def run_inference_on_frame(frame_bgr, conf_threshold):
-    frame_rgb  = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
-<<<<<<< HEAD
-    results    = model(frame_rgb, conf=conf_threshold, imgsz=640, verbose=False)
-    detections = [d for r in results for d in _extract(r)]
-=======
-    pil_frame  = Image.fromarray(frame_rgb)
-    results    = model(frame_rgb, conf=conf_threshold, imgsz=640, verbose=False)
-    detections = [d for r in results for d in _extract(r, source_image=pil_frame)]
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-
+def draw_boxes_on_frame(frame_bgr, detections):
+    """Draw bounding boxes and labels on a BGR frame."""
     for det in detections:
         cat = det['category_info']
         if det['xyxy'] is None:
@@ -521,525 +392,809 @@ def run_inference_on_frame(frame_bgr, conf_threshold):
         cv2.rectangle(frame_bgr, (x1, y1 - th - 14), (x1 + tw + 10, y1), cat['color'], -1)
         cv2.putText(frame_bgr, label, (x1 + 5, y1 - 5),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.55, (255, 255, 255), 2, cv2.LINE_AA)
+    return frame_bgr
 
-    return frame_bgr, detections
+
+def run_inference_on_frame(frame_bgr, conf_threshold):
+    """Real-time webcam inference optimized for low latency (augment=False)."""
+    frame_rgb  = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    # augment=False is CRITICAL for live video stream performance
+    results    = model(frame_rgb, conf=conf_threshold, imgsz=640, augment=False, verbose=False)
+    detections = [d for r in results for d in _extract(r)]
+    detections = _apply_per_class_filter(detections)
+    annotated  = draw_boxes_on_frame(frame_bgr, detections)
+    return annotated, detections
 
 
-# ─────────────────────────────────────────────
-# Global CSS — official portal theme
-#   Ink:        #14213D   (headings / primary text)
-#   Ashoka Blue #0F4C81   (primary / links / header)
-#   Saffron     #E17A1D   (accent / CTAs)
-#   India Green #15803D   (biodegradable / success)
-#   Paper       #F5F6F8   (page background)
-#   Card        #FFFFFF
-#   Border      #DCE1E8
-#   Muted text  #5B6B7C
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Global CSS — Stembayo Eco-Tech Precision (Referenced from Stitch AI Design)
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Source+Sans+3:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Literata:ital,opsz,wght@0,7..72,400..800;1,7..72,400..700&family=Nunito+Sans:ital,opsz,wght@0,6..12,300..800;1,6..12,300..700&family=IBM+Plex+Mono:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
 
-html, body, [class*="css"] {
-    font-family: 'Source Sans 3', sans-serif;
-    background-color: #F5F6F8 !important;
-    color: #263241;
+::selection {
+    background: #C8E8D0;
+    color: #2A6038;
+}
+
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: #F5F1EA;
+}
+::-webkit-scrollbar-thumb {
+    background: #D4CCBF;
+    border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #6B6358;
+}
+
+html, body, [class*="css"], [data-testid="stAppViewContainer"] {
+    font-family: 'Nunito Sans', -apple-system, sans-serif !important;
+    background-color: #FAF6F0 !important;
+    color: #2E3230 !important;
+}
+
+.font-headline {
+    font-family: 'Literata', Georgia, serif !important;
+}
+
+.material-symbols-outlined {
+    font-family: 'Material Symbols Outlined' !important;
+    font-weight: normal;
+    font-style: normal;
+    font-size: 20px;
+    line-height: 1;
+    letter-spacing: normal;
+    text-transform: none;
+    display: inline-block;
+    white-space: nowrap;
+    word-wrap: normal;
+    direction: ltr;
+    -webkit-font-feature-settings: 'liga';
+    -webkit-font-smoothing: antialiased;
+    vertical-align: middle;
 }
 
 #MainMenu, footer, header { visibility: hidden; }
-.block-container { padding-top: 0 !important; padding-bottom: 2rem !important; max-width: 1180px; }
+.block-container {
+    padding-top: 1rem !important;
+    padding-bottom: 2.5rem !important;
+    max-width: 1360px;
+}
 
-/* ── Tricolour strip ── */
-.tricolour-strip { display: flex; width: 100%; height: 5px; margin-bottom: 0; }
-.tricolour-strip div { flex: 1; }
-.strip-saffron { background: #FF9933; }
-.strip-white   { background: #FFFFFF; border-top: 1px solid #E5E7EB; border-bottom: 1px solid #E5E7EB; }
-.strip-green   { background: #138808; }
-
-/* ── Official header bar ── */
-.gov-header {
-    background: linear-gradient(180deg, #123A66 0%, #0F4C81 100%);
-    padding: 0.85rem 2rem;
+/* Top App Bar */
+.stb-navbar {
+    background: #FAF6F0;
+    border: 1px solid #EAE6DE;
+    padding: 0.85rem 1.4rem;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 0;
+    border-radius: 12px;
+    margin-bottom: 1.1rem;
+    box-shadow: 0 1px 4px rgba(46, 50, 48, 0.04);
 }
-.gov-header-left { display: flex; align-items: center; gap: 0.9rem; }
-.emblem-badge {
-    width: 46px; height: 46px;
-    border-radius: 50%;
-    background: #FFFFFF;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.4rem;
-    border: 2px solid #E17A1D;
+.stb-navbar-left {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+}
+.stb-logo-mark {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    background: #4A7C59;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.35rem;
     flex-shrink: 0;
+    box-shadow: 0 1px 3px rgba(74, 124, 89, 0.25);
 }
-.gov-header-title { color: #FFFFFF; }
-.gov-header-eyebrow {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.66rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #B9D3EC;
-    margin-bottom: 2px;
-}
-.gov-header-name {
-    font-family: 'Fraunces', serif;
-    font-size: 1.18rem;
-    font-weight: 600;
-    line-height: 1.25;
-}
-.gov-header-right { display: flex; align-items: center; gap: 0.6rem; }
-.gov-pill {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.66rem;
-    letter-spacing: 0.08em;
-    color: #DCE9F7;
-    border: 1px solid rgba(255,255,255,0.35);
-    border-radius: 3px;
-    padding: 4px 10px;
-    text-transform: uppercase;
-}
-
-/* ── Breadcrumb ── */
-.breadcrumb {
-    background: #FFFFFF;
-    border-bottom: 1px solid #DCE1E8;
-    padding: 0.55rem 2rem;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    color: #5B6B7C;
-    letter-spacing: 0.02em;
-}
-.breadcrumb span.current { color: #0F4C81; font-weight: 600; }
-
-/* ── Hero / circular notice ── */
-.hero-block {
-    background: #FFFFFF;
-    border: 1px solid #DCE1E8;
-    border-top: 4px solid #E17A1D;
-    border-radius: 4px;
-    padding: 2.1rem 2.6rem;
-    margin: 1.6rem 0 1.4rem;
-}
-.hero-ref {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.7rem;
-    letter-spacing: 0.1em;
-    text-transform: uppercase;
-    color: #E17A1D;
-    margin-bottom: 0.6rem;
+.stb-title-row {
     display: flex;
     align-items: center;
     gap: 0.5rem;
 }
-.hero-ref::before { content: '§'; font-size: 0.9rem; }
-.hero-title {
-    font-family: 'Fraunces', serif;
-    font-size: 2.15rem;
-    font-weight: 600;
-    color: #14213D;
+.stb-title-main {
+    font-family: 'Literata', Georgia, serif;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #2E3230;
     line-height: 1.2;
-    margin-bottom: 0.55rem;
+    letter-spacing: -0.015em;
 }
-.hero-sub {
-    font-size: 0.96rem;
-    color: #5B6B7C;
-    max-width: 640px;
-    line-height: 1.65;
+.stb-version-pill {
+    font-family: 'Nunito Sans', sans-serif;
+    font-size: 0.68rem;
+    font-weight: 700;
+    background: #F0E8DB;
+    color: #5E5548;
+    padding: 2px 8px;
+    border-radius: 9999px;
 }
-.hero-badge-row { display: flex; gap: 0.55rem; margin-top: 1.3rem; flex-wrap: wrap; }
-.hero-badge {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.66rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    padding: 5px 11px;
-    border-radius: 3px;
-    border: 1px solid;
+.stb-title-sub {
+    font-size: 0.75rem;
+    color: #4A4E4A;
+    font-weight: 500;
+    margin-top: 2px;
 }
-.hb-blue   { border-color: #0F4C81; color: #0F4C81; background: #EAF2FA; }
-.hb-green  { border-color: #15803D; color: #15803D; background: #ECFDF3; }
-.hb-amber  { border-color: #E17A1D; color: #B45309; background: #FFF7ED; }
-
-/* ── Status bar ── */
-.status-bar {
-    background: #FFFFFF;
-    border: 1px solid #DCE1E8;
-    border-radius: 4px;
-    padding: 0.7rem 1.3rem;
+.stb-meta-wrap {
     display: flex;
     align-items: center;
-    gap: 1.8rem;
-    margin-bottom: 1.2rem;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
-    color: #5B6B7C;
-    letter-spacing: 0.03em;
-    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.6rem;
 }
-.status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-.dot-green { background: #15803D; box-shadow: 0 0 5px rgba(21,128,61,0.5); }
-.dot-amber { background: #E17A1D; box-shadow: 0 0 5px rgba(225,122,29,0.5); }
-.dot-grey  { background: #A9B4C0; }
-.status-val { color: #0F4C81; font-weight: 600; }
-
-/* ── Section label ── */
-.section-label {
+.stb-session-pill {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.68rem;
-    color: #0F4C81;
-    letter-spacing: 0.14em;
+    color: #4A4E4A;
+    background: #F5F1EA;
+    border: 1px solid #EAE6DE;
+    padding: 4px 9px;
+    border-radius: 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.stb-status-pill {
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: #002110;
+    background: #C8E8D0;
+    border: 1px solid #A5D6B2;
+    border-radius: 9999px;
+    padding: 4px 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+.stb-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4A7C59;
+}
+
+/* Sub-Header Utility Control Strip */
+.stb-control-strip {
+    background: #F5F1EA;
+    border: 1px solid #EAE6DE;
+    border-radius: 12px;
+    padding: 0.85rem 1.2rem;
+    margin-bottom: 1.1rem;
+    box-shadow: 0 1px 3px rgba(46, 50, 48, 0.03);
+}
+
+/* Mas Bayo Virtual Assistant Banner */
+.stb-masbayo-card {
+    background: #F0ECE4;
+    border: 1px solid #E4E0D8;
+    border-radius: 12px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    box-shadow: 0 1px 3px rgba(46, 50, 48, 0.03);
+}
+.stb-masbayo-avatar {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #C8E8D0;
+    color: #2A6038;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    flex-shrink: 0;
+    box-shadow: 0 1px 2px rgba(42, 96, 56, 0.15);
+}
+.stb-masbayo-content {
+    flex: 1;
+}
+.stb-masbayo-title {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.25rem;
+    flex-wrap: wrap;
+}
+.stb-masbayo-name {
+    font-size: 0.88rem;
+    font-weight: 800;
+    color: #4A7C59;
+    letter-spacing: 0.02em;
     text-transform: uppercase;
-    margin-bottom: 0.7rem;
+}
+.stb-masbayo-role {
+    font-size: 0.72rem;
+    color: #4A4E4A;
+    font-weight: 600;
+}
+.stb-masbayo-dialogue {
+    font-size: 0.82rem;
+    color: #2E3230;
+    line-height: 1.5;
+    margin-bottom: 0.5rem;
+}
+.stb-masbayo-chips {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+.stb-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+}
+.chip-organik {
+    background: #C8E8D0;
+    color: #2A6038;
+    border: 1px solid #A5D6B2;
+}
+.chip-daurulang {
+    background: #F0E8DB;
+    color: #4A4538;
+    border: 1px solid #D4CCBF;
+}
+.chip-residu {
+    background: #FFDAD8;
+    color: #690005;
+    border: 1px solid #F5A9A7;
+}
+
+/* System Status HUD Pill */
+.hud-status-pill {
+    background: #2E3230;
+    color: #FAF6F0;
+    border-radius: 6px;
+    padding: 0.5rem 0.95rem;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.74rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.85rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.hud-pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #8ECF9E;
+    display: inline-block;
+    margin-right: 6px;
+}
+
+/* Section Header Bar */
+.section-heading-bar {
+    font-family: 'Literata', Georgia, serif;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #2E3230;
+    letter-spacing: -0.01em;
+    margin-bottom: 0.65rem;
     padding-bottom: 0.35rem;
-    border-bottom: 1px solid #DCE1E8;
+    border-bottom: 1px solid #EAE6DE;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
 }
 
-/* ── Gazette-style detection card ── */
-.det-card {
+/* Detection Card (Right Column) */
+.stb-det-card {
+    background: #F5F1EA;
+    border: 1px solid #EAE6DE;
+    border-radius: 12px;
+    padding: 0.95rem 1.1rem;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 1px 3px rgba(46, 50, 48, 0.03);
+    transition: transform 0.15s ease;
+}
+.stb-det-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.6rem;
+    margin-bottom: 0.5rem;
+}
+.stb-det-left {
+    display: flex;
+    align-items: center;
+    gap: 0.65rem;
+}
+.stb-det-icon-badge {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+}
+.stb-det-title {
+    font-family: 'Literata', Georgia, serif;
+    font-size: 0.96rem;
+    font-weight: 700;
+    color: #2E3230;
+    line-height: 1.2;
+}
+.stb-det-sub {
+    font-size: 0.7rem;
+    color: #4A4E4A;
+    margin-top: 1px;
+}
+.stb-det-conf {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #4A7C59;
     background: #FFFFFF;
-    border: 1px solid #DCE1E8;
-    border-left: 4px solid;
-    border-radius: 3px;
-    padding: 0.85rem 1.05rem;
-    margin: 0.55rem 0;
+    border: 1px solid #D4CCBF;
+    padding: 3px 8px;
+    border-radius: 6px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+    flex-shrink: 0;
 }
-.det-card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 3px; }
-.det-card-title { font-family: 'Fraunces', serif; font-size: 1rem; font-weight: 600; color: #14213D; }
-.det-card-ref { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: #A0ACB9; letter-spacing: 0.04em; white-space: nowrap; }
-.det-card-meta { font-size: 0.78rem; color: #5B6B7C; display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; margin-top: 6px; }
-.conf-pill { font-family: 'IBM Plex Mono', monospace; font-size: 0.7rem; padding: 2px 9px; border-radius: 3px; font-weight: 600; }
-.nature-tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.64rem; letter-spacing: 0.07em; padding: 2px 9px; border-radius: 3px; border: 1px solid; text-transform: uppercase; }
-.bin-tag { background: #F5F6F8; border: 1px solid #DCE1E8; border-radius: 3px; padding: 2px 9px; font-size: 0.72rem; color: #445468; font-family: 'IBM Plex Mono', monospace; }
-.sched-tag { font-family: 'IBM Plex Mono', monospace; font-size: 0.64rem; color: #8593A3; }
-
-/* ── Info / disposal panel ── */
-.info-panel { background: #FFFFFF; border: 1px solid #DCE1E8; border-radius: 4px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
-.info-panel-title { font-family: 'Fraunces', serif; font-size: 0.88rem; font-weight: 600; color: #14213D; margin-bottom: 0.6rem; border-bottom: 1px solid #DCE1E8; padding-bottom: 0.4rem; }
-
-/* ── Sidebar "Schedule" table row ── */
-.cat-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.42rem 0; border-bottom: 1px dotted #DCE1E8; font-size: 0.78rem; }
-.cat-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
-.cat-name { color: #29394D; font-weight: 500; flex: 1; }
-.cat-sched { font-family: 'IBM Plex Mono', monospace; font-size: 0.62rem; color: #A0ACB9; margin-right: 6px; }
-.cat-bin { font-family: 'IBM Plex Mono', monospace; font-size: 0.64rem; color: #7A8A9C; }
-
-/* ── Upload zone ── */
-.upload-hint { border: 2px dashed #C6CEDA; border-radius: 6px; padding: 2.5rem; text-align: center; color: #8593A3; font-size: 0.85rem; margin-bottom: 1rem; background: #FFFFFF; }
-
-/* ── Tabs ── */
-.stTabs [data-baseweb="tab-list"] { background: #FFFFFF !important; border-radius: 4px !important; border: 1px solid #DCE1E8 !important; padding: 4px !important; gap: 4px !important; }
-.stTabs [data-baseweb="tab"] { background: transparent !important; border-radius: 3px !important; color: #5B6B7C !important; font-family: 'Fraunces', serif !important; font-weight: 600 !important; font-size: 0.88rem !important; padding: 0.5rem 1.2rem !important; border: none !important; transition: all 0.2s !important; }
-.stTabs [aria-selected="true"] { background: #EAF2FA !important; color: #0F4C81 !important; border: 1px solid #0F4C81 !important; }
-
-/* ── Buttons ── */
-.stButton > button { font-family: 'Source Sans 3', sans-serif !important; font-weight: 600 !important; font-size: 0.85rem !important; border-radius: 4px !important; transition: all 0.2s !important; letter-spacing: 0.01em !important; }
-.stButton > button[kind="primary"] { background: #E17A1D !important; color: #FFFFFF !important; border: none !important; box-shadow: 0 2px 8px rgba(225,122,29,0.28) !important; }
-.stButton > button[kind="primary"]:hover { background: #C2670F !important; box-shadow: 0 3px 10px rgba(225,122,29,0.4) !important; }
-.stButton > button[kind="primary"]:disabled { background: #C6CEDA !important; box-shadow: none !important; cursor: not-allowed !important; }
-.stButton > button[kind="secondary"], .stButton > button:not([kind="primary"]) { background: #FFFFFF !important; color: #0F4C81 !important; border: 1px solid #C6CEDA !important; }
-.stButton > button:not([kind="primary"]):hover { border-color: #0F4C81 !important; background: #EAF2FA !important; }
-
-/* ── Slider ── */
-.stSlider > div > div > div > div { background: #0F4C81 !important; }
-
-/* ── Sidebar ── */
-section[data-testid="stSidebar"] { background: #FFFFFF !important; border-right: 1px solid #DCE1E8 !important; }
-section[data-testid="stSidebar"] .stMarkdown h3, section[data-testid="stSidebar"] .stMarkdown h2 {
-    font-family: 'Fraunces', serif !important; color: #14213D !important; font-size: 0.85rem !important;
-    letter-spacing: 0.02em !important; text-transform: none !important; font-weight: 600 !important;
+.stb-det-bin-bar {
+    background: #FFFFFF;
+    border: 1px solid #E4E0D8;
+    border-radius: 8px;
+    padding: 0.4rem 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.45rem;
+}
+.stb-bin-label-tag {
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #4A4E4A;
+}
+.stb-bin-dest-pill {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+.stb-rotor-instruction {
+    background: #FFFFFF;
+    border: 1px solid #EAE6DE;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    font-size: 0.74rem;
+    color: #4A4E4A;
+    line-height: 1.45;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+}
+.stb-rotor-bold {
+    font-weight: 700;
+    color: #2E3230;
 }
 
-/* ── Number input ── */
-.stNumberInput > div > div > input { background: #FFFFFF !important; border: 1px solid #C6CEDA !important; color: #263241 !important; border-radius: 4px !important; font-family: 'IBM Plex Mono', monospace !important; }
+/* Reference Card: Pedoman Standar 3 Wadah Adiwiyata */
+.stb-pedoman-panel {
+    background: #F0ECE4;
+    border: 1px solid #E4E0D8;
+    border-radius: 12px;
+    padding: 1rem 1.2rem;
+    margin-bottom: 1rem;
+    box-shadow: 0 1px 3px rgba(46, 50, 48, 0.03);
+}
+.stb-pedoman-title {
+    font-family: 'Literata', Georgia, serif;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #2E3230;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    margin-bottom: 0.2rem;
+}
+.stb-pedoman-sub {
+    font-size: 0.72rem;
+    color: #4A4E4A;
+    margin-bottom: 0.65rem;
+    display: block;
+}
+.stb-pedoman-item {
+    background: #FFFFFF;
+    border: 1px solid #EAE6DE;
+    border-radius: 8px;
+    padding: 0.6rem 0.8rem;
+    margin-bottom: 0.45rem;
+}
+.stb-pedoman-item:last-child {
+    margin-bottom: 0;
+}
+.stb-pedoman-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 0.2rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+.stb-pedoman-desc {
+    font-size: 0.7rem;
+    color: #4A4E4A;
+    line-height: 1.35;
+}
 
-.stAlert { border-radius: 4px !important; }
-
-/* ── Footer ── */
-.gov-footer-wrap { background: #14213D; margin-top: 2.4rem; }
-.gov-footer { max-width: 1180px; margin: 0 auto; padding: 1.8rem 2rem 1.2rem; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 1.6rem; }
-.footer-col-title { font-family: 'IBM Plex Mono', monospace; font-size: 0.68rem; letter-spacing: 0.1em; text-transform: uppercase; color: #7DA8D6; margin-bottom: 0.7rem; }
-.footer-col a, .footer-col div.flink { display: block; font-size: 0.8rem; color: #C3D2E3; margin-bottom: 0.45rem; text-decoration: none; }
-.footer-brand { font-family: 'Fraunces', serif; font-size: 1.05rem; color: #FFFFFF; font-weight: 600; margin-bottom: 0.5rem; }
-.footer-disclaimer { font-size: 0.76rem; color: #7E8EA3; line-height: 1.6; max-width: 480px; }
-.gov-footer-bottom {
-    border-top: 1px solid rgba(255,255,255,0.12);
-    text-align: center;
+/* Hardware Status Indicator Widget */
+.stb-hardware-widget {
+    background: #EAE6DE;
+    border: 1px solid #D4CCBF;
+    border-radius: 10px;
+    padding: 0.75rem 1rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.8rem;
+    margin-top: 0.6rem;
+    box-shadow: 0 1px 2px rgba(46, 50, 48, 0.03);
+}
+.stb-hw-left {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    min-width: 0;
+}
+.stb-hw-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4A7C59;
+    flex-shrink: 0;
+}
+.stb-hw-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 0.72rem;
+    color: #2E3230;
+    display: block;
+}
+.stb-hw-sub {
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.66rem;
-    color: #6C7D93;
-    letter-spacing: 0.06em;
-    padding: 0.9rem 0 1.1rem;
-    text-transform: uppercase;
+    color: #4A4E4A;
+    display: block;
+}
+.stb-hw-badge {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #4A7C59;
+    background: #FFFFFF;
+    border: 1px solid #C8E8D0;
+    padding: 2px 7px;
+    border-radius: 4px;
+    flex-shrink: 0;
+}
+
+/* Completely Hide Streamlit Sidebar */
+[data-testid="stSidebar"],
+section[data-testid="stSidebar"],
+[data-testid="collapsedControl"] {
+    display: none !important;
+}
+
+/* Top Navbar Page Link Tabs */
+div[data-testid="stPageLink-NavLink"] {
+    background: #F0ECE4 !important;
+    border: 1px solid #D4CCBF !important;
+    border-radius: 8px !important;
+    padding: 6px 14px !important;
+    font-weight: 600 !important;
+    color: #4A4E4A !important;
+    transition: all 0.15s ease !important;
+    box-shadow: 0 1px 2px rgba(46, 50, 48, 0.03) !important;
+}
+div[data-testid="stPageLink-NavLink"]:hover {
+    background: #EAE6DE !important;
+    color: #2E3230 !important;
+}
+
+/* Streamlit Tabs */
+.stTabs [data-baseweb="tab-list"] {
+    background: #F0ECE4 !important;
+    border-radius: 10px !important;
+    padding: 4px !important;
+    gap: 4px !important;
+    border: 1px solid #E4E0D8 !important;
+}
+.stTabs [data-baseweb="tab"] {
+    border-radius: 8px !important;
+    color: #4A4E4A !important;
+    font-weight: 600 !important;
+    font-size: 0.85rem !important;
+    padding: 0.5rem 1.3rem !important;
+    border: none !important;
+    transition: all 0.15s ease !important;
+}
+.stTabs [aria-selected="true"] {
+    background: #4A7C59 !important;
+    color: #FFFFFF !important;
+    font-weight: 700 !important;
+    box-shadow: 0 1px 3px rgba(74, 124, 89, 0.25) !important;
+}
+
+/* Primary Action Buttons */
+.stButton > button {
+    font-family: 'Nunito Sans', -apple-system, sans-serif !important;
+    font-weight: 700 !important;
+    font-size: 0.86rem !important;
+    border-radius: 8px !important;
+    padding: 0.6rem 1.2rem !important;
+    transition: all 0.15s ease !important;
+}
+.stButton > button[kind="primary"] {
+    background: #4A7C59 !important;
+    color: #FFFFFF !important;
+    border: 1px solid #3D6B4B !important;
+    box-shadow: 0 1px 3px rgba(74, 124, 89, 0.2) !important;
+}
+.stButton > button[kind="primary"]:hover {
+    background: #3D6B4B !important;
+    border-color: #2A6038 !important;
+}
+.stButton > button:not([kind="primary"]) {
+    background: #F0ECE4 !important;
+    color: #2E3230 !important;
+    border: 1px solid #D4CCBF !important;
+}
+.stButton > button:not([kind="primary"]):hover {
+    border-color: #6B6358 !important;
+    background: #EAE6DE !important;
+    color: #0F172A !important;
+}
+
+/* Slider */
+.stSlider > div > div > div > div {
+    background: #4A7C59 !important;
+}
+
+/* Empty / Inactive State Boxes */
+.stb-empty-box {
+    background: #F5F1EA;
+    border: 1.5px dashed #D4CCBF;
+    border-radius: 12px;
+    padding: 3rem 2rem;
+    text-align: center;
+    color: #4A4E4A;
+}
+.stb-empty-icon {
+    font-size: 2.2rem;
+    margin-bottom: 0.6rem;
+}
+.stb-empty-title {
+    font-family: 'Literata', Georgia, serif;
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #2E3230;
+    margin-bottom: 0.3rem;
+}
+.stb-empty-subtitle {
+    font-size: 0.78rem;
+    color: #6B6358;
+}
+
+/* Clean Institutional Footer */
+.stb-footer {
+    border-top: 1px solid #E4E0D8;
+    margin-top: 3.5rem;
+    padding-top: 1.8rem;
+    background: #FAF6F0;
+    color: #4A4E4A;
+    font-size: 0.76rem;
+    line-height: 1.6;
+}
+.stb-footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.stb-footer-bold {
+    font-weight: 700;
+    color: #2E3230;
 }
 </style>
 """, unsafe_allow_html=True)
+# ─────────────────────────────────────────────────────────────────────────────
+# Tier 1 — Top Navigation Bar
+# ─────────────────────────────────────────────────────────────────────────────
+nav_brand_col, nav_links_col, nav_meta_col = st.columns([1.8, 1.4, 1.1], vertical_alignment="center")
 
-# ─────────────────────────────────────────────
-# Tricolour strip + official header
-# ─────────────────────────────────────────────
-st.markdown("""
-<div class="tricolour-strip"><div class="strip-saffron"></div><div class="strip-white"></div><div class="strip-green"></div></div>
-<div class="gov-header">
-    <div class="gov-header-left">
-        <div class="emblem-badge">🇮🇳</div>
-        <div class="gov-header-title">
-            <div class="gov-header-eyebrow">Government of India · Ministry of Environment, Forest &amp; Climate Change</div>
-            <div class="gov-header-name">Smart Waste Management System</div>
+with nav_brand_col:
+    st.markdown("""
+    <div class="stb-navbar-left" style="padding: 0.35rem 0;">
+        <div class="stb-logo-mark"><span class="material-symbols-outlined" style="font-size:24px; color:#FFFFFF;">eco</span></div>
+        <div>
+            <div class="stb-title-row">
+                <span class="stb-title-main">SORTIVA</span>
+                <span class="stb-version-pill">Kiosk v2.4</span>
+            </div>
+            <div class="stb-title-sub">The Stembayo Eco-Sort Platform · SMKN 2 Depok Sleman</div>
         </div>
     </div>
-</div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# Hero
-# ─────────────────────────────────────────────
-st.markdown("""
-<div class="hero-block">
-    <div class="hero-ref">Circular No. SWMS/2026/AI-DET &nbsp;·&nbsp; Effective Immediately</div>
-    <div class="hero-title">Classify, sort and recover municipal solid waste using computer vision</div>
-    <div class="hero-sub">
-        This portal identifies waste items from a live camera feed or an uploaded photograph, assigns each item
-        to its statutory bin category, and records the observation for municipal reporting.
+with nav_links_col:
+    nl1, nl2 = st.columns(2)
+    with nl1:
+        st.page_link("app.py", label="Konsol Kamera", icon="📷")
+    with nl2:
+        st.page_link("pages/dashboard.py", label="Dashboard Analitik", icon="📊")
+
+with nav_meta_col:
+    st.markdown("""
+    <div class="stb-meta-wrap">
+        <div class="stb-session-pill"><span class="material-symbols-outlined" style="font-size:14px;">schedule</span> Kiosk-01</div>
+        <div class="stb-status-pill"><span class="stb-pulse-dot"></span> StemVision Ready</div>
     </div>
-    <div class="hero-badge-row">
-<<<<<<< HEAD
-        <span class="hero-badge hb-blue">YOLOv8m Object Detection</span>
-=======
-        <span class="hero-badge hb-blue">YOLOv8m Detection + ResNet50 Classification</span>
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-        <span class="hero-badge hb-amber">8 Notified Waste Classes</span>
-        <span class="hero-badge hb-green">Live Camera &amp; Photo Upload</span>
+    """, unsafe_allow_html=True)
+
+st.markdown("<hr style='margin: 0.3rem 0 0.8rem 0; border: none; border-bottom: 1px solid #EAE6DE;'>", unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Tier 2 — Sub-Header Utility Toolbar
+# ─────────────────────────────────────────────────────────────────────────────
+with st.container():
+    tb_c1, tb_c2, tb_c3, tb_c4 = st.columns([1.2, 2.2, 1.6, 1.4], vertical_alignment="center")
+
+    with tb_c1:
+        camera_index = st.number_input(
+            "Perangkat Kamera", min_value=0, max_value=5, value=0, step=1,
+            help="0 = Kamera default / laptop. 1 atau 2 = Webcam USB eksternal."
+        )
+
+    with tb_c2:
+        conf_threshold = st.slider(
+            "Threshold Confidence (YOLOv8)", 0.05, 1.0, 0.20, 0.05,
+            help="Nilai batas minimum akurasi agar objek diakui model."
+        )
+
+    with tb_c3:
+        show_all = st.checkbox(
+            "Tampilkan Semua Bounding Box", value=True,
+            help="Menampilkan seluruh objek terdeteksi meski dengan probabilitas rendah."
+        )
+
+    with tb_c4:
+        with st.popover("📖 Indeks 8 Klasifikasi YOLOv8"):
+            st.markdown("##### 8 Kelas StemVision &amp; Wadah Tujuan")
+            for category, info in WASTE_CATEGORIES.items():
+                st.markdown(f"""
+                <div style="display:flex; align-items:center; justify-content:space-between; padding:0.35rem 0; border-bottom:1px solid #EAE6DE; font-size:0.75rem;">
+                    <span>{info['icon']} <b>{category.replace('_',' ').title()}</b></span>
+                    <span style="font-size:0.68rem; font-weight:700; color:{info['hex']}; background:#FFFFFF; border:1px solid #D4CCBF; padding:1px 6px; border-radius:4px;">
+                        {info['category']}
+                    </span>
+                </div>
+                """, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Mas Bayo Virtual Assistant Banner
+# ─────────────────────────────────────────────────────────────────────────────
+st.markdown("""
+<div class="stb-masbayo-card">
+    <div class="stb-masbayo-avatar"><span class="material-symbols-outlined" style="font-size:24px; color:#2A6038;">smart_toy</span></div>
+    <div class="stb-masbayo-content">
+        <div class="stb-masbayo-title">
+            <span class="stb-masbayo-name">MAS BAYO</span>
+            <span class="stb-masbayo-role">· Asisten Pilah Sampah Adiwiyata</span>
+        </div>
+        <div class="stb-masbayo-dialogue">
+            Arahkan sampah ke depan kamera atau unggah foto untuk identifikasi otomatis menuju 3 wadah Adiwiyata:
+        </div>
+        <div class="stb-masbayo-chips">
+            <span class="stb-chip chip-organik"><span>🍃</span> Wadah 1: Organik (Kompos / Pupuk) - Hijau</span>
+            <span class="stb-chip chip-daurulang"><span>♻️</span> Wadah 2: Daur Ulang (Kertas, Plastik, Logam) - Kuning/Biru</span>
+            <span class="stb-chip chip-residu"><span>⚠️</span> Wadah 3: Residu &amp; B3 (Medis, Kimia, Baterai) - Merah</span>
+        </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
 if model is None:
-    st.warning("The detection model could not be loaded. Verify that `models/best.pt` exists before using this portal.")
+    st.error("Model deteksi belum dapat dimuat. Pastikan berkas `models/best.pt` tersedia di direktori proyek.")
 else:
     _model_ok, _model_msg = check_model_classes(model)
     if not _model_ok:
         st.warning(_model_msg)
 
-<<<<<<< HEAD
-=======
-if resnet_model is None:
-    st.info(
-        "ℹ️ **ResNet50 classifier not loaded** — `models/resnet50_waste.pth` not found. "
-        "YOLO's own class labels will be used as a fallback until you train and place the ResNet50 model. "
-        "Run `python scripts/train_resnet50.py` to train it."
-    )
-
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-# ─────────────────────────────────────────────
-# Sidebar
-# ─────────────────────────────────────────────
-with st.sidebar:
-    st.markdown("### Detection Settings")
-    conf_threshold = st.slider("Confidence Threshold", 0.05, 1.0, 0.20, 0.05,
-                               help="Lower = more detections but noisier results")
-    show_all = st.checkbox(
-        "Show ALL model predictions (photo upload)", value=True,
-        help="Lists every prediction the model makes, even at 1% confidence. "
-             "Very low-confidence items are likely wrong — check the confidence tag.")
-    camera_index   = st.number_input("Camera Index", min_value=0, max_value=5, value=0, step=1,
-                                     help="0 = default webcam. Try 1 or 2 if camera fails.")
-    if model is not None:
-<<<<<<< HEAD
-        st.caption(f"Model task: {getattr(model, 'task', '?')} · {len(model.names)} classes")
-=======
-        st.caption(f"YOLO task: {getattr(model, 'task', '?')} · {len(model.names)} classes")
-    resnet_status = "✅ loaded" if resnet_model is not None else "⚠️ not found — run train_resnet50.py"
-    st.caption(f"ResNet50: {resnet_status}")
->>>>>>> d10834e (Add YOLO+ResNet50 two-stage pipeline, training scripts, evaluation reports)
-    st.markdown("---")
-    st.page_link("pages/dashboard.py", label="Analytics Dashboard", icon="📊")
-    st.markdown("---")
-
-    st.markdown("### Schedule I — Waste Classification Index")
-    for category, info in WASTE_CATEGORIES.items():
-        st.markdown(f"""
-        <div class="cat-row">
-            <div class="cat-dot" style="background:{info['hex']};"></div>
-            <span class="cat-sched">{info['schedule']}</span>
-            <span class="cat-name">{info['icon']} {category.replace('_',' ').title()}</span>
-            <span class="cat-bin">{info['bin']}</span>
-        </div>""", unsafe_allow_html=True)
-
-# ─────────────────────────────────────────────
-# Tabs
-# ─────────────────────────────────────────────
+# ─────────────────────────────────────────────────────────────────────────────
+# Main Workspaces: Live Camera vs Photo Upload
+# ─────────────────────────────────────────────────────────────────────────────
 if "webcam_running" not in st.session_state:
     st.session_state.webcam_running = False
 
-tab1, tab2 = st.tabs(["Live Camera Detection", "Photo Upload & Analysis"])
+tab1, tab2 = st.tabs(["Live Stream Kamera", "Analisis Unggah Foto"])
 
-# ══════════════════════════════════════════════
-# TAB 2 — UPLOAD IMAGE
-# ══════════════════════════════════════════════
-with tab2:
-    st.markdown('<div class="section-label">Image Analysis</div>', unsafe_allow_html=True)
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 1 — LIVE WEBCAM INSPECTION
+# ═════════════════════════════════════════════════════════════════════════════
+with tab1:
+    col_vid, col_info = st.columns([3, 1.8], gap="large")
 
-    uploaded_file = st.file_uploader(
-        "Upload an image to analyse",
-        type=['png', 'jpg', 'jpeg', 'bmp', 'gif'],
-        help="Supports JPG, PNG, BMP, GIF"
-    )
-
-    if uploaded_file is not None:
-        # The live-camera loop blocks the script, so stop it when a new photo
-        # arrives; otherwise the analysis below would never run.
-        _seen = (uploaded_file.name, int(uploaded_file.size))
-        if st.session_state.get("seen_upload") != _seen:
-            st.session_state.seen_upload = _seen
-            st.session_state.webcam_running = False
-        image = Image.open(uploaded_file)
-        image = ImageOps.exif_transpose(image).convert("RGB")
-        col1, col2 = st.columns([1, 1], gap="large")
-
-        with col1:
-            st.markdown('<div class="section-label">Input Image</div>', unsafe_allow_html=True)
-            st.image(image, width='stretch')
-
-        with col2:
-            st.markdown('<div class="section-label">Classification Report</div>', unsafe_allow_html=True)
-            if model is not None:
-                effective_conf = 0.001 if show_all else conf_threshold
-                with st.spinner("Running AI analysis…"):
-                    detections = detect_multiscale(image, effective_conf)
-                detections = sorted(detections, key=lambda d: -d['confidence'])
-
-                if detections:
-                    # Streamlit re-runs this script on every click or slider move.
-                    # Save to the database only once per (file, threshold) so the
-                    # dashboard numbers are not inflated by repeated reruns.
-                    _upload_key = (
-                        str(getattr(uploaded_file, "file_id", uploaded_file.name)),
-                        int(uploaded_file.size),
-                        round(float(effective_conf), 2),
-                    )
-                    if st.session_state.get("last_saved_upload") != _upload_key:
-                        save_detections(
-                            detections, source="upload",
-                            image_id=f"IMG-{datetime.now():%Y%m%d-%H%M%S}",
-                            image_name=uploaded_file.name,
-                        )
-                        st.session_state.last_saved_upload = _upload_key
-
-                    bio_count    = sum(1 for d in detections if d['category_info'].get('nature') == 'Biodegradable')
-                    nonbio_count = sum(1 for d in detections if d['category_info'].get('nature') == 'Non-Biodegradable')
-                    haz_count    = sum(1 for d in detections if d['category_info'].get('nature') == 'Hazardous')
-
-                    st.markdown(f"""
-                    <div class="status-bar" style="margin-bottom:1rem;">
-                        <span>DETECTED: <span class="status-val">{len(detections)}</span></span>
-                        <span style="color:#15803D;">BIO: {bio_count}</span>
-                        <span style="color:#C2410C;">NON-BIO: {nonbio_count}</span>
-                        <span style="color:#B91C1C;">HAZ: {haz_count}</span>
-                    </div>""", unsafe_allow_html=True)
-
-                    _counts = Counter(d['class'].replace('_', ' ').title() for d in detections)
-                    st.markdown(
-                        "**Items found in this image:** " +
-                        ", ".join(f"{k} ×{v}" for k, v in _counts.most_common()))
-
-                    for i, det in enumerate(detections):
-                        c   = det['category_info']['hex']
-                        nat = det['category_info'].get('nature', 'Unknown')
-                        nc  = NATURE_COLORS.get(nat, NATURE_COLORS['Unknown'])
-                        st.markdown(f"""
-                        <div class="det-card" style="border-left-color:{c};">
-                            <div class="det-card-top">
-                                <div class="det-card-title">{det['category_info']['icon']} {det['class'].replace('_',' ').title()}</div>
-                                <div class="det-card-ref">{ref_number(i, prefix="UPL")}</div>
-                            </div>
-                            <div class="det-card-meta">
-                                <span class="conf-pill" style="background:{c}18;color:{c};">{det['confidence']*100:.1f}%</span>
-                                <span class="bin-tag">{det['category_info']['bin']}</span>
-                                <span class="sched-tag">{det['category_info']['schedule']} · {conf_band(det['confidence'])} confidence</span>
-                                <span class="nature-tag" style="background:{nc['bg']};color:{nc['text']};border-color:{nc['border']};">{nat}</span>
-                            </div>
-                            <div style="font-size:0.75rem;color:#7A8A9C;margin-top:6px;">
-                                {det['category_info']['description']}
-                            </div>
-                        </div>""", unsafe_allow_html=True)
-
-                    st.markdown('<div class="section-label" style="margin-top:1.2rem;">Annotated Output</div>', unsafe_allow_html=True)
-                    # results[0].plot() returns a BGR array, so tell Streamlit
-                    # (otherwise red and blue colours appear swapped).
-                    st.image(draw_detections(image, detections), channels="RGB", width='stretch')
-                else:
-                    st.markdown("""
-                    <div style="background:#FFFFFF; border:1px solid #DCE1E8; border-radius:4px;
-                                padding:2rem; text-align:center; color:#5B6B7C;">
-                        <div style="font-size:1.7rem;">🔍</div>
-                        <div style="font-family:'Fraunces',serif; font-weight:600; margin:0.5rem 0; color:#14213D;">
-                            No waste items detected
-                        </div>
-                        <div style="font-size:0.78rem; font-family:'IBM Plex Mono',monospace; color:#8593A3;">
-                            TRY LOWERING THE CONFIDENCE THRESHOLD IN THE SIDEBAR
-                        </div>
-                    </div>""", unsafe_allow_html=True)
-                    with st.expander("Diagnostics — what the model sees (conf ≥ 0.1%)", expanded=True):
-                        st.write(f"Model task: **{getattr(model, 'task', '?')}**")
-                        st.write("Model classes:", [model.names[i] for i in range(len(model.names))])
-                        _raw = debug_predictions(image)
-                        if _raw:
-                            st.table({"Class": [r[0] for r in _raw], "Confidence": [r[1] for r in _raw]})
-                        else:
-                            st.write("Model returned **nothing** even at 1% confidence.")
-            else:
-                st.error("Model not loaded. Please verify `models/best.pt` exists.")
-    else:
+    with col_vid:
         st.markdown("""
-        <div class="upload-hint">
-            <div style="font-size:1.9rem; margin-bottom:0.8rem;">📂</div>
-            <div style="font-family:'Fraunces',serif; font-size:0.95rem; color:#14213D; font-weight:600;">
-                Drop an image file above to begin analysis
-            </div>
-            <div style="font-size:0.72rem; margin-top:0.4rem; font-family:'IBM Plex Mono',monospace; letter-spacing:0.06em; color:#A0ACB9;">
-                SUPPORTED FORMATS: JPG · PNG · BMP · GIF
-            </div>
+        <div class="section-heading-bar">
+            <span>Umpan Kamera Kiosk &amp; Inspeksi Visual</span>
+            <span style="font-family:'IBM Plex Mono'; font-size:0.72rem; color:#4A4E4A;">30 FPS | OPTICAL ARRAY 01</span>
         </div>
         """, unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════
-# TAB 1 — LIVE WEBCAM
-# ══════════════════════════════════════════════
-with tab1:
-    col_vid, col_info = st.columns([3, 1], gap="medium")
-
-    with col_vid:
-        st.markdown('<div class="section-label">Camera Feed</div>', unsafe_allow_html=True)
         btn_row = st.columns(2)
         with btn_row[0]:
             start_btn = st.button(
-                "▶  Start Detection", type="primary", width='stretch',
+                "▶  Mulai Deteksi Kamera", type="primary", width='stretch',
                 disabled=model is None,
             )
         with btn_row[1]:
-            stop_btn = st.button("⏹  Stop", width='stretch')
+            stop_btn = st.button("⏹  Hentikan Kamera", width='stretch')
 
         frame_placeholder  = st.empty()
         status_placeholder = st.empty()
 
     with col_info:
-        st.markdown('<div class="section-label">Live Detections</div>', unsafe_allow_html=True)
+        st.markdown("""
+        <div class="section-heading-bar">
+            <span>Hasil Identifikasi Real-Time</span>
+            <span style="font-family:'IBM Plex Mono'; font-size:0.7rem; color:#4A7C59; font-weight:700;">LIVE SYNC ●</span>
+        </div>
+        """, unsafe_allow_html=True)
+
         det_placeholder = st.empty()
 
         st.markdown("""
-        <div class="info-panel">
-            <div class="info-panel-title">Disposal Guide</div>
-            <div style="font-size:0.78rem; color:#445468; line-height:1.85;">
-                🟢 <b style="color:#15803D;">Green Bin</b> — Organic / Glass<br>
-                🔵 <b style="color:#1D4ED8;">Blue Bin</b> — Paper / Cardboard / Metal<br>
-                🟡 <b style="color:#B45309;">Yellow Bin</b> — Plastic<br>
-                🔴 <b style="color:#B91C1C;">Red Bin</b> — Medical / Hazardous<br>
-                🟣 <b style="color:#6D28D9;">E-Waste Bin</b> — Electronics
+        <div class="stb-pedoman-panel">
+            <div class="stb-pedoman-title">Pedoman Standar 3 Wadah Adiwiyata SMKN 2 Depok</div>
+            <span class="stb-pedoman-sub">Kepatuhan Audit Lingkungan Hidup Sekolah Adiwiyata Mandiri:</span>
+            <div class="stb-pedoman-item">
+                <div class="stb-pedoman-head" style="color:#4A7C59;">
+                    <span>🍃 Wadah 1: Hijau</span>
+                    <span style="font-family:'IBM Plex Mono'; font-size:10px;">ORGANIK</span>
+                </div>
+                <div class="stb-pedoman-desc">Sisa sayuran, buah, nasi, daun gugur taman, serbuk kayu bangunan, ampas kopi kantin.</div>
+            </div>
+            <div class="stb-pedoman-item">
+                <div class="stb-pedoman-head" style="color:#705C30;">
+                    <span>♻️ Wadah 2: Kuning / Biru</span>
+                    <span style="font-family:'IBM Plex Mono'; font-size:10px;">DAUR ULANG</span>
+                </div>
+                <div class="stb-pedoman-desc">Botol/gelas PET, kaleng aluminium, kertas HVS tugas, kardus sparepart, botol kaca sirup.</div>
+            </div>
+            <div class="stb-pedoman-item">
+                <div class="stb-pedoman-head" style="color:#B83230;">
+                    <span>⚠️ Wadah 3: Merah</span>
+                    <span style="font-family:'IBM Plex Mono'; font-size:10px;">RESIDU &amp; B3</span>
+                </div>
+                <div class="stb-pedoman-desc">Puntung sisa las, masker medis, baterai bekas multimeter, residu solder &amp; oli bengkel mesin.</div>
             </div>
         </div>
+        <!-- IoT hardware widget placeholder — re-enable after ESP32/Arduino connected -->
         """, unsafe_allow_html=True)
 
     if start_btn:
@@ -1051,150 +1206,360 @@ with tab1:
         cap = open_camera(int(camera_index))
 
         if not cap.isOpened():
-            st.error(f"Could not open camera {int(camera_index)}. Try changing the Camera Index in the sidebar.")
+            st.error(f"Kamera dengan indeks {int(camera_index)} tidak dapat dibuka. Silakan sesuaikan Indeks Perangkat Kamera pada toolbar atas.")
             st.session_state.webcam_running = False
         else:
             try:
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH,  640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 cap.set(cv2.CAP_PROP_FPS, 30)
+
                 status_placeholder.markdown("""
-                <div class="status-bar">
-                    <span><span class="status-dot dot-green"></span>CAMERA ACTIVE</span>
-                    <span><span class="status-dot dot-amber"></span>MODEL RUNNING</span>
-                    <span>STREAM: <span class="status-val">LIVE</span></span>
-                </div>""", unsafe_allow_html=True)
+                <div class="hud-status-pill">
+                    <span><span class="hud-pulse-dot"></span>KAMERA AKTIF · REAL-TIME STEMVISION</span>
+                    <span>30.2 FPS | 24ms Latency</span>
+                </div>
+                """, unsafe_allow_html=True)
 
                 SAVE_EVERY_SECONDS = 2.0
                 last_save = 0.0
                 frame_count = 0
                 consecutive_failures = 0
-                MAX_CONSECUTIVE_FAILURES = 20  # ~2s of bad reads before giving up
+                MAX_CONSECUTIVE_FAILURES = 20
+
+                # ── Real-Time Performance & Pipeline Optimizations ─────────
+                BLUR_THRESHOLD = 60.0           # Lowered threshold to avoid false-skips
+                FRAME_AVG_WINDOW = 3            # Majority-vote buffer
+                INFERENCE_INTERVAL = 2          # Process AI every N frames (cuts GPU load by 50%)
+                _prediction_buffer = []
+                cached_detections = []
+                last_det_sig = None
+                last_det_time = 0.0
+
+                fps_time = time.time()
+                fps_display = 30.0
+                latency_ms = 15.0
 
                 while st.session_state.webcam_running:
                     try:
+                        t0 = time.time()
                         ret, frame = cap.read()
                         if not ret or frame is None:
                             consecutive_failures += 1
                             if consecutive_failures >= MAX_CONSECUTIVE_FAILURES:
-                                status_placeholder.error(
-                                    "Camera stopped responding. Stopping detection — "
-                                    "try a different Camera Index in the sidebar."
-                                )
+                                status_placeholder.error("Aliran kamera terhenti. Pemindaian dihentikan otomatis.")
                                 st.session_state.webcam_running = False
                                 break
-                            status_placeholder.warning("Frame capture failed — retrying…")
-                            time.sleep(0.1)
+                            status_placeholder.warning("Tangkapan frame terhambat — mencoba ulang...")
+                            time.sleep(0.05)
                             continue
 
                         consecutive_failures = 0
-
-                        annotated, detections = run_inference_on_frame(frame, conf_threshold)
-
                         frame_count += 1
+
+                        # Skip blurry frames
+                        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                        lap_var = cv2.Laplacian(gray, cv2.CV_64F).var()
+                        if lap_var < BLUR_THRESHOLD:
+                            display = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                            frame_placeholder.image(display, channels="RGB", width='stretch')
+                            time.sleep(0.005)
+                            continue
+
+                        # Frame-skip AI inference to maximize smooth video FPS
+                        if frame_count % INFERENCE_INTERVAL == 0:
+                            inf_start = time.time()
+                            annotated, detections = run_inference_on_frame(frame, conf_threshold)
+                            latency_ms = (time.time() - inf_start) * 1000.0
+                            cached_detections = detections
+
+                            # Majority voting for temporal stability
+                            if detections:
+                                dominant = max(detections, key=lambda d: d['confidence'])['class']
+                                _prediction_buffer.append(dominant)
+                                if len(_prediction_buffer) > FRAME_AVG_WINDOW:
+                                    _prediction_buffer.pop(0)
+                                if len(_prediction_buffer) >= FRAME_AVG_WINDOW:
+                                    from collections import Counter as _Counter
+                                    vote = _Counter(_prediction_buffer).most_common(1)[0]
+                                    if vote[1] < 2:
+                                        detections = []
+                                        cached_detections = []
+                        else:
+                            # Re-use previous detections on interleaved frames
+                            annotated = draw_boxes_on_frame(frame, cached_detections)
+                            detections = cached_detections
+
+                        # Periodic DB logging
                         if detections and (time.time() - last_save) >= SAVE_EVERY_SECONDS:
-                            save_detections(detections, source="webcam")
+                            accepted = [d for d in detections if not d.get('uncertain', False)]
+                            review = [d for d in detections if d.get('uncertain', False)]
+                            if accepted:
+                                save_detections(accepted, source="webcam")
+                            if review:
+                                save_to_review_queue(review, source="webcam")
                             last_save = time.time()
 
+                        # Streamlit frame display
                         display = cv2.cvtColor(annotated, cv2.COLOR_BGR2RGB)
                         frame_placeholder.image(display, channels="RGB", width='stretch')
 
-                        if detections:
-                            det_html = ""
-                            for i, det in enumerate(detections):
-                                c    = det['category_info']['hex']
-                                nat  = det['category_info'].get('nature', 'Unknown')
-                                nc   = NATURE_COLORS.get(nat, NATURE_COLORS['Unknown'])
-                                det_html += f"""
-                                <div class="det-card" style="border-left-color:{c};">
-                                    <div class="det-card-top">
-                                        <div class="det-card-title">{det['category_info']['icon']} {det['class'].replace('_',' ').title()}</div>
-                                        <div class="det-card-ref">{ref_number(frame_count + i)}</div>
-                                    </div>
-                                    <div class="det-card-meta">
-                                        <span class="conf-pill" style="background:{c}18;color:{c};">{det['confidence']*100:.0f}%</span>
-                                        <span class="bin-tag">{det['category_info']['bin']}</span>
-                                        <span class="nature-tag" style="background:{nc['bg']};color:{nc['text']};border-color:{nc['border']};">{nat}</span>
-                                    </div>
-                                </div>"""
-                            det_placeholder.markdown(det_html, unsafe_allow_html=True)
-                        else:
-                            det_placeholder.markdown("""
-                            <div style="color:#A0ACB9; font-size:0.8rem; font-family:'IBM Plex Mono',monospace;
-                                        padding:1.5rem 1rem; text-align:center; letter-spacing:0.06em; background:#FFFFFF;
-                                        border:1px solid #DCE1E8; border-radius:4px;">
-                                NO OBJECTS DETECTED<br><span style="font-size:0.65rem;">SCANNING…</span>
-                            </div>""", unsafe_allow_html=True)
+                        # Throttle DOM re-render of detection cards to avoid UI lag
+                        current_sig = tuple((d['class'], round(d['confidence'], 1)) for d in detections)
+                        now = time.time()
+                        if current_sig != last_det_sig or (now - last_det_time) > 0.4:
+                            last_det_sig = current_sig
+                            last_det_time = now
+                            if detections:
+                                det_html = ""
+                                for i, det in enumerate(detections):
+                                    cat_info = det['category_info']
+                                    hex_col = cat_info['hex']
+                                    nat = cat_info.get('nature', 'Unknown')
+                                    nc = NATURE_COLORS.get(nat, NATURE_COLORS['Unknown'])
 
-                        time.sleep(0.05)
+                                    det_html += f"""
+                                    <div class="stb-det-card">
+                                        <div class="stb-det-header">
+                                            <div class="stb-det-left">
+                                                <div class="stb-det-icon-badge" style="background:{hex_col}22; color:{hex_col};">
+                                                    <span class="material-symbols-outlined" style="font-size:22px;">{cat_info.get('mat_icon', 'recycling')}</span>
+                                                </div>
+                                                <div>
+                                                    <div class="stb-det-title">{det['class'].replace('_',' ').title()}</div>
+                                                    <div class="stb-det-sub">{cat_info.get('material_sub', 'Material Terdeteksi')}</div>
+                                                </div>
+                                            </div>
+                                            <div class="stb-det-conf">{det['confidence']*100:.1f}%</div>
+                                        </div>
+                                        <div class="stb-det-bin-bar">
+                                            <span class="stb-bin-label-tag">Target Penempatan</span>
+                                            <span class="stb-bin-dest-pill" style="background:{nc['bg']}; color:{nc['text']}; border:1px solid {nc['border']};">
+                                                <span>{cat_info['icon']}</span>
+                                                <span>{cat_info['bin']}</span>
+                                            </span>
+                                        </div>
+                                        <div class="stb-rotor-instruction">
+                                            <span class="material-symbols-outlined" style="font-size:16px; color:#4A7C59; flex-shrink:0; padding-top:2px;">precision_manufacturing</span>
+                                            <div>
+                                                <span class="stb-rotor-bold">Instruksi Rotor &amp; Pengguna:</span> {cat_info.get('rotor_instruction', cat_info['description'])}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    """
+                                det_placeholder.markdown(det_html, unsafe_allow_html=True)
+                            else:
+                                det_placeholder.markdown("""
+                                <div class="stb-empty-box" style="padding:2rem 1rem;">
+                                    <div style="font-size:1.8rem; margin-bottom:0.4rem;">🎯</div>
+                                    <div class="stb-empty-title" style="font-size:0.95rem;">
+                                        Menunggu Objek Sampah
+                                    </div>
+                                    <div class="stb-empty-subtitle" style="font-size:0.75rem;">
+                                        Arahkan objek ke depan lensa kamera pemilah
+                                    </div>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                        # Update HUD with real FPS and latency every 15 frames
+                        dt = time.time() - t0
+                        if dt > 0:
+                            fps_inst = 1.0 / dt
+                            fps_display = 0.85 * fps_display + 0.15 * fps_inst
+                        if frame_count % 15 == 0:
+                            status_placeholder.markdown(f"""
+                            <div class="hud-status-pill">
+                                <span><span class="hud-pulse-dot"></span>KAMERA AKTIF · REAL-TIME STEMVISION</span>
+                                <span>{fps_display:.1f} FPS | {latency_ms:.0f}ms AI Latency</span>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                        # Minimal yield to keep Streamlit responsive without capping FPS
+                        time.sleep(0.002)
 
                     except Exception as loop_err:
-                        # Never let a single bad frame or inference error
-                        # kill the whole Streamlit script run — surface it
-                        # and stop the loop cleanly instead.
-                        status_placeholder.error(f"Detection loop stopped due to an error: {loop_err}")
+                        status_placeholder.error(f"Pemindaian terhenti akibat kendala: {loop_err}")
                         st.session_state.webcam_running = False
                         break
             finally:
-                # Always release the camera, even if the loop exits via an
-                # exception, so the device isn't left locked for other apps.
                 cap.release()
 
             frame_placeholder.empty()
             status_placeholder.markdown("""
-            <div class="status-bar">
-                <span><span class="status-dot dot-grey"></span>CAMERA OFFLINE</span>
-                <span>STREAM: <span style="color:#8593A3;">STOPPED</span></span>
-            </div>""", unsafe_allow_html=True)
+            <div class="hud-status-pill" style="background:#4A4E4A;">
+                <span>KAMERA NONAKTIF</span>
+                <span>STATUS: STANDBY</span>
+            </div>
+            """, unsafe_allow_html=True)
     else:
         frame_placeholder.markdown("""
-        <div style="background:#FFFFFF; border:2px dashed #C6CEDA; border-radius:6px;
-                    padding:4rem 2rem; text-align:center; color:#8593A3;">
-            <div style="font-size:2.4rem; margin-bottom:1rem;">📷</div>
-            <div style="font-family:'Fraunces',serif; font-size:1.05rem; color:#14213D; font-weight:600;">
-                Camera feed inactive
-            </div>
-            <div style="font-size:0.78rem; margin-top:0.4rem; font-family:'IBM Plex Mono',monospace;
-                        letter-spacing:0.06em; color:#A0ACB9;">
-                CLICK START DETECTION TO BEGIN
-            </div>
-        </div>""", unsafe_allow_html=True)
+        <div class="stb-empty-box">
+            <div class="stb-empty-icon">📷</div>
+            <div class="stb-empty-title">Kamera Inspeksi Belum Aktif</div>
+            <div class="stb-empty-subtitle">Klik tombol 'Mulai Deteksi Kamera' untuk mengaktifkan pemindaian real-time.</div>
+        </div>
+        """, unsafe_allow_html=True)
 
+# ═════════════════════════════════════════════════════════════════════════════
+# TAB 2 — PHOTO UPLOAD & ANALYSIS
+# ═════════════════════════════════════════════════════════════════════════════
+with tab2:
+    st.markdown('<div class="section-heading-bar">Unggah Berkas Foto Sampah untuk Batch Processing</div>', unsafe_allow_html=True)
 
-# ─────────────────────────────────────────────
-# Footer
-# ─────────────────────────────────────────────
+    uploaded_file = st.file_uploader(
+        "Pilih foto sampah untuk dianalisis",
+        type=['png', 'jpg', 'jpeg', 'bmp', 'gif'],
+        help="Format didukung: JPG, PNG, BMP, GIF"
+    )
+
+    if uploaded_file is not None:
+        _seen = (uploaded_file.name, int(uploaded_file.size))
+        if st.session_state.get("seen_upload") != _seen:
+            st.session_state.seen_upload = _seen
+            st.session_state.webcam_running = False
+
+        image = Image.open(uploaded_file)
+        image = ImageOps.exif_transpose(image).convert("RGB")
+        col1, col2 = st.columns([1, 1], gap="large")
+
+        with col1:
+            st.markdown('<div class="section-heading-bar">Foto Asli</div>', unsafe_allow_html=True)
+            st.image(image, width='stretch')
+
+        with col2:
+            st.markdown('<div class="section-heading-bar">Laporan Klasifikasi AI</div>', unsafe_allow_html=True)
+            if model is not None:
+                effective_conf = 0.001 if show_all else conf_threshold
+                with st.spinner("Menjalankan analisis visi komputer..."):
+                    # Keep raw results for the optional diagnostic view, but
+                    # apply production thresholds before writing to the database.
+                    raw_detections = detect_multiscale(image, effective_conf)
+                    classified_detections = _apply_per_class_filter(raw_detections)
+                    detections = raw_detections if show_all else classified_detections
+                detections = sorted(detections, key=lambda d: -d['confidence'])
+
+                if detections:
+                    _upload_key = (
+                        str(getattr(uploaded_file, "file_id", uploaded_file.name)),
+                        int(uploaded_file.size),
+                        round(float(effective_conf), 2),
+                    )
+                    if st.session_state.get("last_saved_upload") != _upload_key:
+                        accepted = [d for d in classified_detections
+                                    if not d.get('uncertain', False)]
+                        review = [d for d in classified_detections
+                                  if d.get('uncertain', False)]
+                        image_id = f"IMG-{datetime.now():%Y%m%d-%H%M%S}"
+                        if accepted:
+                            save_detections(
+                                accepted, source="upload", image_id=image_id,
+                                image_name=uploaded_file.name,
+                            )
+                        if review:
+                            save_to_review_queue(review, source="upload")
+                        st.session_state.last_saved_upload = _upload_key
+
+                    bio_count    = sum(1 for d in detections if d['category_info'].get('nature') == 'Biodegradable')
+                    nonbio_count = sum(1 for d in detections if d['category_info'].get('nature') == 'Non-Biodegradable')
+                    haz_count    = sum(1 for d in detections if d['category_info'].get('nature') == 'Hazardous')
+
+                    st.markdown(f"""
+                    <div class="hud-status-pill" style="margin-bottom:1rem; background:#F0ECE4; color:#2E3230; border:1px solid #D4CCBF;">
+                        <span>TOTAL TERDETEKSI: <b>{len(detections)}</b></span>
+                        <span style="color:#4A7C59; font-weight:700;">ORGANIK: {bio_count}</span>
+                        <span style="color:#705C30; font-weight:700;">DAUR ULANG: {nonbio_count}</span>
+                        <span style="color:#B83230; font-weight:700;">RESIDU/B3: {haz_count}</span>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    _counts = Counter(d['class'].replace('_', ' ').title() for d in detections)
+                    st.markdown(
+                        "**Objek Ditemukan:** " +
+                        ", ".join(f"**{k}** ({v}x)" for k, v in _counts.most_common())
+                    )
+
+                    for i, det in enumerate(detections):
+                        cat_info = det['category_info']
+                        hex_col  = cat_info['hex']
+                        nat      = cat_info.get('nature', 'Unknown')
+                        nc       = NATURE_COLORS.get(nat, NATURE_COLORS['Unknown'])
+
+                        st.markdown(f"""
+                        <div class="stb-det-card">
+                            <div class="stb-det-header">
+                                <div class="stb-det-left">
+                                    <div class="stb-det-icon-badge" style="background:{hex_col}22; color:{hex_col};">
+                                        <span class="material-symbols-outlined" style="font-size:22px;">{cat_info.get('mat_icon', 'recycling')}</span>
+                                    </div>
+                                    <div>
+                                        <div class="stb-det-title">{det['class'].replace('_',' ').title()}</div>
+                                        <div class="stb-det-sub">{cat_info.get('material_sub', 'Material Terdeteksi')}</div>
+                                    </div>
+                                </div>
+                                <div class="stb-det-conf">{det['confidence']*100:.1f}% ({conf_band(det['confidence'])})</div>
+                            </div>
+                            <div class="stb-det-bin-bar">
+                                <span class="stb-bin-label-tag">Target Penempatan</span>
+                                <span class="stb-bin-dest-pill" style="background:{nc['bg']}; color:{nc['text']}; border:1px solid {nc['border']};">
+                                    <span>{cat_info['icon']}</span>
+                                    <span>{cat_info['bin']}</span>
+                                </span>
+                            </div>
+                            <div class="stb-rotor-instruction">
+                                <span class="material-symbols-outlined" style="font-size:16px; color:#4A7C59; flex-shrink:0; padding-top:2px;">precision_manufacturing</span>
+                                <div>
+                                    <span class="stb-rotor-bold">Instruksi Rotor &amp; Pengguna:</span> {cat_info.get('rotor_instruction', cat_info['description'])}
+                                </div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                    st.markdown('<div class="section-heading-bar" style="margin-top:1.5rem;">Visualisasi Anotasi Bounding Box</div>', unsafe_allow_html=True)
+                    st.image(draw_detections(image, detections), channels="RGB", width='stretch')
+                else:
+                    st.markdown("""
+                    <div class="stb-empty-box" style="padding:2.5rem 1.5rem;">
+                        <div style="font-size:2rem; margin-bottom:0.4rem;">🔍</div>
+                        <div class="stb-empty-title">Tidak Ada Objek Sampah Terdeteksi</div>
+                        <div class="stb-empty-subtitle">
+                            Coba turunkan Ambang Batas Keyakinan pada toolbar atas jika objek berukuran kecil atau redup.
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    with st.expander("Diagnostik Model (Keyakinan ≥ 0.1%)", expanded=True):
+                        st.write(f"Task Model: **{getattr(model, 'task', 'detect')}**")
+                        _raw = debug_predictions(image)
+                        if _raw:
+                            st.table({"Kelas Prediksi": [r[0] for r in _raw], "Tingkat Keyakinan": [r[1] for r in _raw]})
+                        else:
+                            st.write("Model tidak menghasilkan probabilitas di atas 1%.")
+            else:
+                st.error("Model deteksi belum siap. Periksa kembali ketersediaan berkas weights.")
+    else:
+        st.markdown("""
+        <div class="stb-empty-box">
+            <div class="stb-empty-icon">📁</div>
+            <div class="stb-empty-title">Letakkan Berkas Gambar Di Atas</div>
+            <div class="stb-empty-subtitle">Mendukung format JPG, PNG, BMP, dan GIF untuk analisis multi-skala komprehensif.</div>
+        </div>
+        """, unsafe_allow_html=True)
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Clean Ecological Institutional Footer
+# ─────────────────────────────────────────────────────────────────────────────
 st.markdown("""
-<div class="gov-footer-wrap">
-    <div class="gov-footer">
-        <div class="footer-col">
-            <div class="footer-brand">Smart Waste Management System</div>
-            <div class="footer-disclaimer">
-                This is a demonstration analytics tool. Bin assignments follow the Schedule I waste index
-                shown in the sidebar and do not replace local municipal by-laws in force in your jurisdiction.
-            </div>
+<div class="stb-footer">
+    <div class="stb-footer-inner">
+        <div>
+            <span class="stb-footer-bold">SMKN 2 Depok Sleman · Sekolah Adiwiyata Mandiri</span>
+            <span style="margin: 0 6px; color:#C4C8BC;">•</span>
+            <span>Eco-Tech STEM Innovation Lab</span>
         </div>
-        <div class="footer-col">
-            <div class="footer-col-title">Portal</div>
-            <div class="flink">Detection Console</div>
-            <div class="flink">Analytics Dashboard</div>
-            <div class="flink">Waste Class Schedule</div>
+        <div style="font-family:'IBM Plex Mono', monospace; font-size:0.72rem;">
+            <span>AI Model: StemVision-YOLOv8m</span>
+            <span style="margin: 0 6px; color:#C4C8BC;">•</span>
+            <span>© 2025 SORTIVA Platform</span>
         </div>
-        <div class="footer-col">
-            <div class="footer-col-title">Resources</div>
-            <div class="flink">Accessibility Statement</div>
-            <div class="flink">Terms of Use</div>
-            <div class="flink">Right to Information</div>
-        </div>
-        <div class="footer-col">
-            <div class="footer-col-title">Contact</div>
-            <div class="flink">Urban Local Body Helpdesk</div>
-            <div class="flink">Report a Malfunction</div>
-            <div class="flink">Sitemap</div>
-        </div>
-    </div>
-    <div class="gov-footer-bottom">
-        Content Owned by Urban Local Body Intelligence Platform &nbsp;·&nbsp; Ministry of Environment, Forest &amp; Climate Change &nbsp;·&nbsp; Government of India
     </div>
 </div>
 """, unsafe_allow_html=True)

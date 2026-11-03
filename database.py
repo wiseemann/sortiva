@@ -225,3 +225,69 @@ init_db()
 
 if __name__ == "__main__":
     print(f"✅ Database initialised at: {DB_PATH}")
+
+
+# ─────────────────────────────────────────────
+# Phase 5.2 — Review queue for uncertain / low-confidence detections
+# ─────────────────────────────────────────────
+def _ensure_review_table():
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS review_queue (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp       TEXT    NOT NULL,
+            source          TEXT    NOT NULL,
+            class_name      TEXT    NOT NULL,
+            confidence      REAL    NOT NULL,
+            status          TEXT    NOT NULL DEFAULT 'pending',
+            corrected_class TEXT,
+            reviewed_at     TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
+
+_ensure_review_table()
+
+
+def save_to_review_queue(detections: list[dict], source: str = "webcam"):
+    """Save low-confidence or uncertain detections for manual review."""
+    if not detections:
+        return
+    conn = sqlite3.connect(DB_PATH)
+    cur  = conn.cursor()
+    ts   = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    for d in detections:
+        cur.execute(
+            "INSERT INTO review_queue (timestamp, source, class_name, confidence) VALUES (?,?,?,?)",
+            (ts, source, d["class"], round(d["confidence"], 4)),
+        )
+    conn.commit()
+    conn.close()
+
+
+def fetch_review_queue(status: str = "pending", limit: int = 50) -> list[dict]:
+    """Fetch items from the review queue."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cur  = conn.cursor()
+    cur.execute(
+        "SELECT * FROM review_queue WHERE status = ? ORDER BY id DESC LIMIT ?",
+        (status, limit),
+    )
+    rows = [dict(r) for r in cur.fetchall()]
+    conn.close()
+    return rows
+
+
+def mark_reviewed(review_id: int, corrected_class: str | None = None):
+    """Mark a review queue item as reviewed, optionally with a corrected class."""
+    conn = sqlite3.connect(DB_PATH)
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    status = "corrected" if corrected_class else "reviewed"
+    conn.execute(
+        "UPDATE review_queue SET status = ?, corrected_class = ?, reviewed_at = ? WHERE id = ?",
+        (status, corrected_class, ts, review_id),
+    )
+    conn.commit()
+    conn.close()

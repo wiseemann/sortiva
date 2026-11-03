@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+
+<html lang="en"><head><meta charset="utf-8"/><meta content="width=device-width, initial-scale=1.0" name="viewport"/><meta content="web_standard" name="shell-type"/><style>@layer base { html, body { margin: 0; padding: 0; } body { overscroll-behavior: none; } main > :first-child { margin-top: 0 !important; } main > :last-child { margin-bottom: 0 !important; } } ::-webkit-scrollbar { display: none; }</style><script src="https://cdn.tailwindcss.com"></script><script id="tailwind-config">tailwind.config = { darkMode: "class", theme: { extend: { colors: { "on-tertiary-fixed-variant": "#554020", "on-surface-variant": "#4a4e4a", "secondary-fixed-dim": "#d4ccbf", "error": "#b83230", "surface-container-highest": "#e4e0d8", "inverse-on-surface": "#f5f0e8", "secondary-fixed": "#f0e8db", "on-tertiary-fixed": "#221a05", "primary-fixed": "#c8e8d0", "surface": "#faf6f0", "on-primary-fixed-variant": "#2a6038", "surface-container-high": "#eae6de", "error-container": "#ffdad8", "outline-variant": "#c4c8bc", "on-error": "#ffffff", "primary": "#4a7c59", "on-error-container": "#690005", "tertiary-container": "#c4a66a", "on-secondary-fixed-variant": "#4a4538", "surface-container-lowest": "#ffffff", "secondary": "#6b6358", "outline": "#74796e", "surface-variant": "#e4e0d8", "on-primary-container": "#d8f0de", "background": "#faf6f0", "inverse-primary": "#8ecf9e", "surface-container": "#f0ece4", "primary-container": "#78a886", "surface-bright": "#faf6f0", "on-secondary-container": "#5e5548", "surface-container-low": "#f5f1ea", "tertiary-fixed-dim": "#dcc48e", "inverse-surface": "#2e3230", "on-primary-fixed": "#002110", "on-primary": "#ffffff", "on-secondary": "#ffffff", "primary-fixed-dim": "#8ecf9e", "on-background": "#2e3230", "on-secondary-fixed": "#1e1a13", "surface-dim": "#dbd7cf", "tertiary": "#705c30", "on-tertiary": "#ffffff", "surface-tint": "#4a7c59", "on-surface": "#2e3230", "on-tertiary-container": "#554020", "tertiary-fixed": "#f8e0a8", "secondary-container": "#f0e8db" }, borderRadius: { "DEFAULT": "0.5rem", "lg": "1rem", "xl": "1.5rem", "full": "9999px" }, spacing: {}, fontFamily: { "headline": ["Literata"], "display": ["Literata"], "body": ["Nunito Sans"], "label": ["Nunito Sans"] }, fontSize: {} } } }</script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Literata:wght@100..900&family=Nunito+Sans:wght@100..900&display=swap" rel="stylesheet"/></head><body class="bg-surface font-body text-on-surface"><header class="fixed top-0 w-full z-50 bg-surface/90 backdrop-blur-xl shadow-[0_1px_8px_rgba(46,50,48,0.06)]"><div class="h-20 w-full px-6 lg:px-12 flex items-center justify-between gap-4"><div class="flex items-center gap-3 min-w-0"><div class="w-10 h-10 rounded-xl bg-primary flex items-center justify-center text-on-primary shrink-0 shadow-sm"><span class="material-symbols-outlined text-2xl">eco</span></div><div class="flex flex-col min-w-0"><div class="flex items-center gap-2"><span class="font-headline font-bold text-lg tracking-tight text-on-surface">SORTIVA</span><span class="hidden sm:inline-block px-2 py-0.5 rounded-full text-xs font-semibold bg-secondary-container text-on-secondary-container">Kiosk v2.4</span></div><span class="text-xs text-on-surface-variant truncate">The Stembayo Eco-Sort Platform · SMKN 2 Depok Sleman</span></div></div><nav class="hidden md:flex items-center p-1.5 rounded-xl bg-surface-container" data-active-classes="bg-primary text-on-primary font-bold shadow-sm"><a aria-current="page" class="px-4 py-2 rounded-lg transition-all bg-primary text-on-primary font-bold shadow-sm" data-path="konsol-kamera" href="#">Konsol Kamera</a><a class="px-4 py-2 rounded-lg text-sm font-medium text-on-surface-variant hover:text-on-surface transition-all" data-path="dashboard-analitik" href="#">Dashboard Analitik</a></nav><div class="flex items-center gap-3 shrink-0"><div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-lg bg-surface-container-low text-xs text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">schedule</span><span class="font-mono">Session Active · Kiosk-01</span></div><div class="flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-primary-fixed text-on-primary-fixed text-xs font-semibold"><span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span><span>StemVision Ready</span></div><div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center"><span class="material-symbols-outlined text-on-primary text-[18px]">person</span></div></div></div></header><main class="w-full pt-20 bg-surface min-h-[calc(100vh-140px)]"><div class="flex flex-col w-full">
+<div class="w-full px-4 sm:px-6 lg:px-10 py-6 max-w-7xl mx-auto flex flex-col gap-6">
+<!-- 1. Top Utility Control Strip -->
+<section class="bg-surface-container-low rounded-xl p-4 sm:p-5 shadow-sm flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-4">
+<div class="flex flex-wrap items-center gap-4 sm:gap-6 flex-1 min-w-0">
+<!-- Input Selector -->
+<div class="flex flex-col gap-1 min-w-[240px] flex-1 sm:flex-initial">
+<label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-primary">videocam</span>
+            Sumber Kamera Input
+          </label>
+<div class="relative">
+<select class="w-full appearance-none bg-surface py-2 pl-3.5 pr-9 text-xs sm:text-sm font-semibold text-on-surface rounded-lg cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary shadow-sm" id="camera-select">
+<option value="cam-1">Webcam Utama HD (Logitech C920)</option>
+<option value="cam-2">Kamera Kiosk Internal Top-Rotor</option>
+</select>
+<span class="material-symbols-outlined pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-on-surface-variant text-lg">unfold_more</span>
+</div>
+</div>
+<!-- Confidence Slider with Badge -->
+<div class="flex flex-col gap-1 min-w-[200px] flex-1 sm:flex-initial">
+<div class="flex items-center justify-between">
+<label class="text-[11px] font-bold uppercase tracking-wider text-on-surface-variant flex items-center gap-1.5">
+<span class="material-symbols-outlined text-[15px] text-tertiary">tune</span>
+              Threshold Confidence
+            </label>
+<span class="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-tertiary-fixed text-on-tertiary-fixed" id="thresh-val">20%</span>
+</div>
+<div class="flex items-center gap-3 pt-1">
+<input class="w-full accent-primary h-2 bg-surface-container-highest rounded-lg cursor-pointer" id="confidence-range" max="1.0" min="0.05" step="0.01" type="range" value="0.20"/>
+</div>
+</div>
+<!-- Checkbox Toggle -->
+<label class="flex items-center gap-3 cursor-pointer pt-2 xl:pt-4 select-none">
+<input checked="" class="w-4 h-4 rounded text-primary accent-primary cursor-pointer" type="checkbox"/>
+<span class="text-xs font-medium text-on-surface-variant">Tampilkan Semua Bounding Box (Termasuk Probabilitas Rendah)</span>
+</label>
+</div>
+<!-- Popover Trigger Button -->
+<div class="relative shrink-0 flex items-center">
+<button class="w-full sm:w-auto px-4 py-2.5 bg-surface text-on-surface text-xs font-bold rounded-lg shadow-sm hover:bg-surface-container flex items-center justify-center gap-2 transition-colors" id="class-popover-btn">
+<span class="material-symbols-outlined text-base text-primary">menu_book</span>
+<span>Indeks 8 Klasifikasi YOLOv8</span>
+<span class="px-1.5 py-0.2 rounded bg-primary-fixed text-on-primary-fixed text-[10px]">8 Kelas</span>
+</button>
+<!-- Popover Overlay Box -->
+<div class="hidden absolute top-full right-0 mt-2 z-30 w-80 p-4 bg-surface-container rounded-xl shadow-xl flex flex-col gap-3" id="class-popover">
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold text-on-surface uppercase tracking-wide">Model Classes (Dataset v3.2)</span>
+<button class="text-on-surface-variant hover:text-on-surface" id="class-popover-close">
+<span class="material-symbols-outlined text-sm">close</span>
+</button>
+</div>
+<div class="grid grid-cols-2 gap-2 text-xs">
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-medium text-on-surface">1. Plastik</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-primary-container"></span>
+<span class="font-medium text-on-surface">2. Kertas</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-tertiary-container"></span>
+<span class="font-medium text-on-surface">3. Kardus</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-secondary"></span>
+<span class="font-medium text-on-surface">4. Logam</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-secondary-fixed-dim"></span>
+<span class="font-medium text-on-surface">5. Kaca</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-primary"></span>
+<span class="font-medium text-on-surface">6. Organik</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-tertiary"></span>
+<span class="font-medium text-on-surface">7. E-Waste</span>
+</div>
+<div class="flex items-center gap-2 p-2 rounded-lg bg-surface">
+<span class="w-2 h-2 rounded-full bg-error"></span>
+<span class="font-medium text-on-surface">8. Medis/B3</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- 2. Mas Bayo Virtual Assistant Banner -->
+<section class="bg-surface-container rounded-xl p-4 sm:p-5 flex flex-col md:flex-row items-start md:items-center gap-4 shadow-sm relative overflow-hidden">
+<div class="w-12 h-12 rounded-xl bg-primary-fixed text-on-primary-fixed flex items-center justify-center shrink-0 shadow-sm">
+<span class="material-symbols-outlined text-2xl" style="font-variation-settings: 'FILL' 1;">smart_toy</span>
+</div>
+<div class="flex-1 min-w-0 flex flex-col gap-2">
+<div class="flex flex-wrap items-center gap-2">
+<span class="text-xs font-extrabold uppercase tracking-wide text-primary">MAS BAYO</span>
+<span class="text-xs text-on-surface-variant font-medium">· Asisten Pilah Sampah Adiwiyata</span>
+</div>
+<p class="text-xs sm:text-sm text-on-surface leading-relaxed">
+          Arahkan sampah ke depan kamera atau unggah foto untuk identifikasi otomatis menuju 3 wadah Adiwiyata:
+        </p>
+<div class="flex flex-wrap items-center gap-2 pt-0.5">
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-primary-fixed text-on-primary-fixed-variant text-xs font-semibold">
+<span>🍃</span>
+<span>Wadah 1: Organik (Kompos / Pupuk) - Hijau</span>
+</span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-secondary-fixed text-on-secondary-fixed-variant text-xs font-semibold">
+<span>♻️</span>
+<span>Wadah 2: Daur Ulang (Kertas, Plastik, Logam) - Kuning/Biru</span>
+</span>
+<span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-error-container text-on-error-container text-xs font-semibold">
+<span>⚠️</span>
+<span>Wadah 3: Residu & B3 (Medis, Kimia, Baterai) - Merah</span>
+</span>
+</div>
+</div>
+</section>
+<!-- 3. Dual-Column Workspace -->
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+<!-- LEFT COLUMN (65% / 8 Cols) -->
+<div class="lg:col-span-8 flex flex-col gap-4">
+<!-- Sub-tab switcher -->
+<div class="flex items-center justify-between border-none">
+<div class="flex items-center p-1 bg-surface-container rounded-xl gap-1">
+<button class="px-4 py-2 rounded-lg text-xs sm:text-sm font-bold bg-primary text-on-primary shadow-sm flex items-center gap-2 transition-all" id="tab-live">
+<span class="material-symbols-outlined text-base">videocam</span>
+<span>Live Stream Kamera</span>
+</button>
+<button class="px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-on-surface-variant hover:text-on-surface flex items-center gap-2 transition-all" id="tab-upload">
+<span class="material-symbols-outlined text-base">upload_file</span>
+<span>Analisis Unggah Foto</span>
+</button>
+</div>
+<div class="hidden sm:flex items-center gap-2 text-xs text-on-surface-variant font-mono">
+<span class="w-2 h-2 rounded-full bg-primary animate-ping"></span>
+<span>YOLOv8x Inference 12ms</span>
+</div>
+</div>
+<!-- TAB 1: Video Viewport Container -->
+<div class="flex flex-col gap-4" id="view-live">
+<div class="relative w-full aspect-video rounded-xl overflow-hidden bg-inverse-surface shadow-md select-none group">
+<!-- Simulated Live Tray Camera Feed -->
+<img class="w-full h-full object-cover" data-alt="High angle view of a clean industrial waste sorting conveyor tray in an eco robotics workshop, featuring an empty plastic bottle and organic banana peel placed for inspection, warm natural sunlight and soft lab lighting, high resolution documentary style photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCmNUpAXfRMhbRzeUBpJQhsfTa1bzxfPY8AmBPPhcjcnMctHzPuslOR7ciDxTL1AkyzyBstARa0Ei6d2Pvm2hoo1dAwEgiTgmyllgxvIUf8mvKtjJm8Z03TQsdpCRshkA6ltIRcMx2mfwEEsAlCu0cmMEuJsmF_wvQ8Qhmw8VUgZv_IqTtQbvYZWSydqz2mtuHZxjf7WPhcm9NvDhRzCDphjfR-fmW0BznvjIx52pdh"/>
+<!-- Lens Vignette & Gradient Overlay -->
+<div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/60 pointer-events-none"></div>
+<!-- Top HUD Control Overlays -->
+<div class="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-1 rounded-md bg-surface/90 backdrop-blur-md text-on-surface font-mono text-[11px] font-bold flex items-center gap-1.5 shadow-sm">
+<span class="w-2 h-2 rounded-full bg-primary animate-pulse"></span>
+<span>KAMERA AKTIF · REAL-TIME STEMVISION</span>
+</span>
+</div>
+<div class="flex items-center gap-2">
+<span class="px-2.5 py-1 rounded-md bg-inverse-surface/80 backdrop-blur-md text-inverse-on-surface font-mono text-[11px]">
+                  REC 2025-05-18 10:42:15 WIB
+                </span>
+<span class="px-2 py-1 rounded-md bg-primary/20 backdrop-blur-md text-inverse-on-surface font-mono text-[11px] font-semibold">
+                  30.2 FPS | 24ms Latency
+                </span>
+</div>
+</div>
+<!-- Scanning Corner HUD brackets -->
+<div class="absolute inset-5 pointer-events-none">
+<!-- Top Left -->
+<div class="absolute top-0 left-0 w-8 h-8 border-t-2 border-l-2 border-primary-fixed/80"></div>
+<!-- Top Right -->
+<div class="absolute top-0 right-0 w-8 h-8 border-t-2 border-r-2 border-primary-fixed/80"></div>
+<!-- Bottom Left -->
+<div class="absolute bottom-0 left-0 w-8 h-8 border-b-2 border-l-2 border-primary-fixed/80"></div>
+<!-- Bottom Right -->
+<div class="absolute bottom-0 right-0 w-8 h-8 border-b-2 border-r-2 border-primary-fixed/80"></div>
+<!-- Center Reticle -->
+<div class="absolute inset-0 flex items-center justify-center opacity-30">
+<span class="material-symbols-outlined text-4xl text-surface">filter_center_focus</span>
+</div>
+</div>
+<!-- Bounding Box 1: Plastic Bottle (PET) -->
+<div class="absolute top-[22%] left-[16%] w-[34%] h-[56%] rounded-lg pointer-events-none transition-all duration-300">
+<div class="w-full h-full rounded-lg bg-tertiary-container/15 flex flex-col justify-between p-2 shadow-sm">
+<!-- Tag Header -->
+<div class="self-start -mt-4 bg-tertiary-fixed text-on-tertiary-fixed px-2 py-0.5 rounded shadow-sm flex items-center gap-1.5 font-mono text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-tertiary"></span>
+<span>Plastik (Botol PET) · 94.6% → Wadah Daur Ulang</span>
+</div>
+<!-- Box details -->
+<div class="self-end bg-surface/90 backdrop-blur-sm text-on-surface px-1.5 py-0.5 rounded text-[10px] font-mono">
+                  x:142 y:98 w:210 h:345
+                </div>
+</div>
+</div>
+<!-- Bounding Box 2: Organic (Banana Skin) -->
+<div class="absolute top-[38%] right-[14%] w-[32%] h-[46%] rounded-lg pointer-events-none transition-all duration-300">
+<div class="w-full h-full rounded-lg bg-primary-fixed/20 flex flex-col justify-between p-2 shadow-sm">
+<!-- Tag Header -->
+<div class="self-start -mt-4 bg-primary text-on-primary px-2 py-0.5 rounded shadow-sm flex items-center gap-1.5 font-mono text-[11px] font-bold">
+<span class="w-1.5 h-1.5 rounded-full bg-primary-container"></span>
+<span>Organik (Kulit Buah) · 88.2% → Wadah Organik</span>
+</div>
+<!-- Box details -->
+<div class="self-end bg-surface/90 backdrop-blur-sm text-on-surface px-1.5 py-0.5 rounded text-[10px] font-mono">
+                  x:490 y:168 w:180 h:240
+                </div>
+</div>
+</div>
+<!-- Bottom Left HUD info -->
+<div class="absolute bottom-4 left-4 flex items-center gap-2 pointer-events-none">
+<span class="px-2 py-1 rounded bg-black/50 backdrop-blur-md text-surface text-[11px] font-mono">
+                Sensor: Stembayo-Optical-Array-01
+              </span>
+</div>
+</div>
+<!-- Kiosk Hardware Action Bar -->
+<div class="bg-surface-container-low p-3 sm:p-4 rounded-xl flex flex-wrap items-center justify-between gap-3 shadow-sm">
+<div class="flex items-center gap-2.5 flex-wrap">
+<button class="px-5 py-2.5 rounded-xl bg-primary text-on-primary font-bold text-xs sm:text-sm hover:opacity-95 shadow-sm flex items-center gap-2 transition-transform active:scale-95">
+<span class="material-symbols-outlined text-base">play_arrow</span>
+<span>Mulai Deteksi Kamera</span>
+</button>
+<button class="px-4 py-2.5 rounded-xl bg-surface-container text-on-surface-variant hover:text-on-surface font-semibold text-xs sm:text-sm flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-base">stop</span>
+<span>Hentikan</span>
+</button>
+</div>
+<button class="px-4 py-2.5 rounded-xl bg-surface text-on-surface font-semibold text-xs sm:text-sm shadow-sm hover:bg-surface-container flex items-center gap-2 transition-colors">
+<span class="material-symbols-outlined text-base text-primary">photo_camera</span>
+<span>Jepret Snapshot Manual</span>
+</button>
+</div>
+</div>
+<!-- TAB 2: Upload Dropzone View (Hidden by default, toggleable) -->
+<div class="hidden flex-col gap-4" id="view-upload">
+<div class="bg-surface-container-low rounded-xl p-6 sm:p-8 flex flex-col items-center justify-center text-center gap-4 shadow-sm">
+<div class="w-16 h-16 rounded-2xl bg-surface-container flex items-center justify-center text-primary">
+<span class="material-symbols-outlined text-3xl">cloud_upload</span>
+</div>
+<div class="flex flex-col gap-1">
+<span class="font-headline font-bold text-base text-on-surface">Unggah Gambar untuk Batch Processing</span>
+<span class="text-xs text-on-surface-variant">Tarik file gambar (JPG, PNG, WebP) ke sini atau jelajahi media lokal</span>
+</div>
+<label class="px-4 py-2 bg-primary text-on-primary font-bold text-xs rounded-xl cursor-pointer shadow-sm hover:opacity-95">
+              Pilih Dokumen Foto
+              <input accept="image/*" class="hidden" type="file"/>
+</label>
+</div>
+<!-- Uploaded Sample Inspection Box -->
+<div class="bg-surface-container rounded-xl p-4 flex flex-col gap-3">
+<div class="flex items-center justify-between">
+<span class="text-xs font-bold text-on-surface flex items-center gap-1.5">
+<span class="material-symbols-outlined text-sm text-primary">image</span>
+                Sample Teranalisis: audit_kantin_meja4.jpg
+              </span>
+<span class="text-[11px] font-mono px-2 py-0.5 rounded bg-surface text-on-surface-variant">3 Objek Ditemukan</span>
+</div>
+<div class="relative w-full h-48 rounded-lg overflow-hidden bg-surface-dim">
+<img class="w-full h-full object-cover" data-alt="Assorted clean recyclable packaging including a milk carton, soda can and cardboard snack box arranged neatly on a school adiwiyata green table, crisp high dynamic range studio photography." src="https://lh3.googleusercontent.com/aida-public/AB6AXuDGQ2P2eGa2moVofZQ_HzsHgSOurRlh4Fkr7bjGVpP0U7bqnWdSMrab1P-b6ldpDnDXkFXzXYUk3d9WiihsHnDMdEWS4_naZjcJIZXwcgSq8WCz0Lpgq-WWUvUIkbImlwYug6CZL3uzPXRhyqNrJmcwdUt3x2cBsiBfVgmFMR_rUQL_rnr17FH3Os3MFylb6-Nz8FO1GKFaMV5huB-D_bQzd6IU3sjqM47BFYrSzF78"/>
+<div class="absolute bottom-2 left-2 flex gap-1.5">
+<span class="px-2 py-1 rounded bg-secondary-fixed text-on-secondary-fixed text-[10px] font-bold">Kardus (96.1%)</span>
+<span class="px-2 py-1 rounded bg-tertiary-fixed text-on-tertiary-fixed text-[10px] font-bold">Logam Kaleng (91.4%)</span>
+</div>
+</div>
+</div>
+</div>
+</div>
+<!-- RIGHT COLUMN (35% / 4 Cols - Actionable Guidance Panel) -->
+<div class="lg:col-span-4 flex flex-col gap-5">
+<!-- Header Section -->
+<div class="flex items-center justify-between">
+<div class="flex flex-col">
+<h2 class="font-headline font-bold text-base text-on-surface">Hasil Identifikasi Real-Time</h2>
+<span class="text-xs text-on-surface-variant font-mono">2 Objek Aktif Terdeteksi</span>
+</div>
+<span class="w-3 h-3 rounded-full bg-primary animate-ping" title="Sinkronisasi Live"></span>
+</div>
+<!-- Active Item Cards Container -->
+<div class="flex flex-col gap-3.5">
+<!-- Card 1: Botol Air Mineral (PET) -->
+<div class="bg-surface-container-low rounded-xl p-4 shadow-sm flex flex-col gap-3 transition-transform hover:-translate-y-0.5">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-secondary-fixed text-on-secondary-fixed-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">water_bottle</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline font-bold text-sm text-on-surface">Botol Air Mineral (PET)</span>
+<span class="text-[11px] text-on-surface-variant">Polietilena Tereftalat</span>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-md bg-surface font-mono font-bold text-xs text-primary shadow-sm shrink-0">
+                94.6%
+              </div>
+</div>
+<!-- Target Bin Badge -->
+<div class="p-2.5 rounded-lg bg-secondary-fixed/60 flex items-center justify-between">
+<span class="text-[11px] font-extrabold uppercase tracking-wide text-on-secondary-fixed-variant">Target Penempatan</span>
+<span class="px-2.5 py-0.5 rounded-full bg-surface text-on-secondary-fixed-variant font-bold text-xs flex items-center gap-1 shadow-sm">
+<span>♻️</span>
+<span>WADAH DAUR ULANG</span>
+</span>
+</div>
+<!-- Rotor Instruction -->
+<div class="p-3 rounded-lg bg-surface flex items-start gap-2.5 text-xs text-on-surface-variant leading-relaxed">
+<span class="material-symbols-outlined text-primary text-base shrink-0 pt-0.5">precision_manufacturing</span>
+<div>
+<span class="font-bold text-on-surface block mb-0.5">Instruksi Rotor & Pengguna:</span>
+                Motor servo mengarahkan kompartemen 2 (Kuning/Biru). Lepas tutup botol dan remas sebelum dimasukkan.
+              </div>
+</div>
+</div>
+<!-- Card 2: Kulit Pisang / Sisa Makanan -->
+<div class="bg-surface-container-low rounded-xl p-4 shadow-sm flex flex-col gap-3 transition-transform hover:-translate-y-0.5">
+<div class="flex items-start justify-between gap-2">
+<div class="flex items-center gap-2.5">
+<div class="w-9 h-9 rounded-lg bg-primary-fixed text-on-primary-fixed-variant flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined text-lg">compost</span>
+</div>
+<div class="flex flex-col">
+<span class="font-headline font-bold text-sm text-on-surface">Kulit Pisang / Sisa Makanan</span>
+<span class="text-[11px] text-on-surface-variant">Limbah Biomassa Segar</span>
+</div>
+</div>
+<div class="px-2.5 py-1 rounded-md bg-surface font-mono font-bold text-xs text-primary shadow-sm shrink-0">
+                88.2%
+              </div>
+</div>
+<!-- Target Bin Badge -->
+<div class="p-2.5 rounded-lg bg-primary-fixed/50 flex items-center justify-between">
+<span class="text-[11px] font-extrabold uppercase tracking-wide text-on-primary-fixed-variant">Target Penempatan</span>
+<span class="px-2.5 py-0.5 rounded-full bg-surface text-primary font-bold text-xs flex items-center gap-1 shadow-sm">
+<span>🍃</span>
+<span>WADAH ORGANIK</span>
+</span>
+</div>
+<!-- Rotor Instruction -->
+<div class="p-3 rounded-lg bg-surface flex items-start gap-2.5 text-xs text-on-surface-variant leading-relaxed">
+<span class="material-symbols-outlined text-primary text-base shrink-0 pt-0.5">precision_manufacturing</span>
+<div>
+<span class="font-bold text-on-surface block mb-0.5">Instruksi Rotor & Pengguna:</span>
+                Motor servo mengarahkan kompartemen 1 (Hijau). Cocok untuk dekomposisi komposter Stembayo.
+              </div>
+</div>
+</div>
+</div>
+<!-- Reference Section: Pedoman Standar 3 Wadah Adiwiyata -->
+<div class="bg-surface-container rounded-xl p-4 sm:p-5 flex flex-col gap-3 shadow-sm">
+<div class="flex items-center gap-2">
+<span class="material-symbols-outlined text-base text-primary">policy</span>
+<h3 class="font-headline font-bold text-xs uppercase tracking-wider text-on-surface">
+              Pedoman Standar 3 Wadah Adiwiyata SMKN 2 Depok
+            </h3>
+</div>
+<span class="text-[11px] text-on-surface-variant">Kepatuhan Audit Lingkungan Hidup Sekolah Adiwiyata Mandiri:</span>
+<!-- Reference Matrix Table -->
+<div class="w-full flex flex-col gap-2 pt-1 text-xs">
+<div class="p-2.5 rounded-lg bg-surface flex flex-col gap-1">
+<div class="flex items-center justify-between font-bold text-primary">
+<span class="flex items-center gap-1"><span>🍃</span> Wadah 1: Hijau</span>
+<span class="font-mono text-[10px] uppercase">Organik</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-snug">
+                Sisa sayuran, buah, nasi, daun gugur taman, serbuk kayu praktek bangunan, ampas kopi kantin.
+              </p>
+</div>
+<div class="p-2.5 rounded-lg bg-surface flex flex-col gap-1">
+<div class="flex items-center justify-between font-bold text-secondary">
+<span class="flex items-center gap-1"><span>♻️</span> Wadah 2: Kuning / Biru</span>
+<span class="font-mono text-[10px] uppercase">Daur Ulang</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-snug">
+                Botol/gelas PET, kaleng aluminium, kertas HVS sisa tugas, kardus sparepart, botol kaca sirup.
+              </p>
+</div>
+<div class="p-2.5 rounded-lg bg-surface flex flex-col gap-1">
+<div class="flex items-center justify-between font-bold text-error">
+<span class="flex items-center gap-1"><span>⚠️</span> Wadah 3: Merah</span>
+<span class="font-mono text-[10px] uppercase">Residu & B3</span>
+</div>
+<p class="text-[11px] text-on-surface-variant leading-snug">
+                Puntung sisa las, masker medis, baterai bekas multimeter, residu solder & oli bengkel mesin.
+              </p>
+</div>
+</div>
+</div>
+
+</div>
+</div>
+</div>
+</div>
+<script>
+  // Confidence Slider Live Update
+  const slider = document.getElementById('confidence-range');
+  const threshVal = document.getElementById('thresh-val');
+  if (slider && threshVal) {
+    slider.addEventListener('input', (e) => {
+      const val = Math.round(e.target.value * 100);
+      threshVal.textContent = val + '%';
+    });
+  }
+
+  // Popover toggle logic
+  const popoverBtn = document.getElementById('class-popover-btn');
+  const popover = document.getElementById('class-popover');
+  const popoverClose = document.getElementById('class-popover-close');
+
+  if (popoverBtn && popover) {
+    popoverBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      popover.classList.toggle('hidden');
+    });
+  }
+
+  if (popoverClose && popover) {
+    popoverClose.addEventListener('click', () => {
+      popover.classList.add('hidden');
+    });
+  }
+
+  document.addEventListener('click', (e) => {
+    if (popover && !popover.contains(e.target) && e.target !== popoverBtn) {
+      popover.classList.add('hidden');
+    }
+  });
+
+  // Tab switching logic (Live vs Upload)
+  const tabLive = document.getElementById('tab-live');
+  const tabUpload = document.getElementById('tab-upload');
+  const viewLive = document.getElementById('view-live');
+  const viewUpload = document.getElementById('view-upload');
+
+  if (tabLive && tabUpload && viewLive && viewUpload) {
+    tabLive.addEventListener('click', () => {
+      tabLive.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-bold bg-primary text-on-primary shadow-sm flex items-center gap-2 transition-all";
+      tabUpload.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-on-surface-variant hover:text-on-surface flex items-center gap-2 transition-all";
+      viewLive.classList.remove('hidden');
+      viewLive.classList.add('flex');
+      viewUpload.classList.add('hidden');
+      viewUpload.classList.remove('flex');
+    });
+
+    tabUpload.addEventListener('click', () => {
+      tabUpload.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-bold bg-primary text-on-primary shadow-sm flex items-center gap-2 transition-all";
+      tabLive.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-on-surface-variant hover:text-on-surface flex items-center gap-2 transition-all";
+      viewUpload.classList.remove('hidden');
+      viewUpload.classList.add('flex');
+      viewLive.classList.add('hidden');
+      viewLive.classList.remove('flex');
+    });
+  }
+</script></main><footer class="w-full bg-surface-container-low py-8"><div class="w-full px-6 lg:px-12 flex flex-col md:flex-row items-center justify-between gap-4 text-xs text-on-surface-variant"><div class="flex items-center gap-2"><span class="material-symbols-outlined text-primary text-[18px]">verified</span><span class="font-medium text-on-surface">SMKN 2 Depok Sleman · Sekolah Adiwiyata Mandiri</span><span class="hidden sm:inline text-outline-variant">•</span><span class="hidden sm:inline">Eco-Tech STEM Innovation Lab</span></div><div class="flex items-center gap-6"><span class="font-mono">AI Model: StemVision-YOLOv8x</span><span>© 2025 SORTIVA Platform. All rights reserved.</span></div></div></footer></body></html>
