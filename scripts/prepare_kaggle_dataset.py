@@ -44,13 +44,13 @@ CLASS_MAP = {
 IGNORE_CLASSES = {"clothes", "shoes", "trash"}
 
 
-def prepare_dataset(source_dir: Path, max_per_class: int = 1000, val_ratio: float = 0.2):
+def prepare_dataset(source_dir: Path, max_per_class: int = 1000, val_ratio: float = 0.15, test_ratio: float = 0.10):
     print(f"\n{'='*60}")
     print(f"  Preparing Dataset from: {source_dir}")
     print(f"  Target directory     : {OUTPUT_DIR}")
     print(f"{'='*60}\n")
 
-    for split in ["train", "valid"]:
+    for split in ["train", "valid", "test"]:
         (OUTPUT_DIR / split / "images").mkdir(parents=True, exist_ok=True)
         (OUTPUT_DIR / split / "labels").mkdir(parents=True, exist_ok=True)
 
@@ -72,10 +72,19 @@ def prepare_dataset(source_dir: Path, max_per_class: int = 1000, val_ratio: floa
 
         images = images[:max_per_class]
         val_count = int(len(images) * val_ratio)
+        test_count = int(len(images) * test_ratio)
+
         val_imgs = set(images[:val_count])
+        test_imgs = set(images[val_count:val_count + test_count])
 
         for img in images:
-            split = "valid" if img in val_imgs else "train"
+            if img in val_imgs:
+                split = "valid"
+            elif img in test_imgs:
+                split = "test"
+            else:
+                split = "train"
+
             dst_img = OUTPUT_DIR / split / "images" / f"kaggle_{img.name}"
             dst_lbl = OUTPUT_DIR / split / "labels" / f"kaggle_{img.stem}.txt"
 
@@ -97,3 +106,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     prepare_dataset(Path(args.kaggle_dir), max_per_class=args.max_per_class)
+
